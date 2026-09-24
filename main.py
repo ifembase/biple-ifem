@@ -40,7 +40,7 @@ DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.docu
 # filigrane + ligne "Délivré à").
 LEVELS: Dict[str, dict] = {
     "L1": dict(file="template_L1.docx", order=["matricule", "nom", "mention", "date", "lieu"]),
-    "L2": dict(file="template_L2.docx", order=["matricule", "nom", "mention", "date", "lieu"]),
+    "L2": dict(file="template_L2.docx", order=["matricule", "nom", "nom", "mention", "date", "lieu"]),
     "L3": dict(file="template_L3.docx", order=["matricule", "nom", "nom", "mention", "date", "lieu"]),
     "M1": dict(file="template_M1.docx", order=["matricule", "nom", "nom", "mention", "date", "lieu"]),
     "M2": dict(file="template_M2.docx", order=["matricule", "nom", "nom", "mention", "date", "lieu"]),
