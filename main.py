@@ -188,6 +188,12 @@ class DiplomeRequest(BaseModel):
         return v
 
 
+class DiplomeBatchRequest(BaseModel):
+    """Requête pour générer plusieurs diplômes d'un coup (sélection multiple
+    côté front) et les récupérer dans une seule archive .zip."""
+    diplomes: List[DiplomeRequest] = Field(..., min_length=1)
+
+
 # --------------------------------------------------------------------------
 # Application
 # --------------------------------------------------------------------------
@@ -233,8 +239,8 @@ def niveaux():
     }
 
 
-@app.post("/generate-diplome")
-def generate_diplome(req: DiplomeRequest):
+def _generate_one(req: DiplomeRequest) -> tuple[str, bytes]:
+    """Génère un diplôme pour UN candidat et renvoie (nom_fichier, contenu_docx)."""
     code = NIVEAU_ALIASES[req.niveau.strip().upper()]
     if code not in _template_cache:
         raise HTTPException(500, f"Template non chargé pour le niveau {code}")
@@ -252,14 +258,50 @@ def generate_diplome(req: DiplomeRequest):
     try:
         buf = _build_docx_bytes(code, values)
     except ValueError as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, f"{req.matricule} ({req.nom}) : {e}")
 
     filename = f"diplome_{code}_{_slugify(req.matricule)}_{_slugify(req.nom)}.docx"
+    return filename, buf.getvalue()
+
+
+@app.post("/generate-diplome")
+def generate_diplome(req: DiplomeRequest):
+    filename, data = _generate_one(req)
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
         "Access-Control-Expose-Headers": "Content-Disposition",
     }
-    return StreamingResponse(buf, media_type=DOCX_MIME, headers=headers)
+    return StreamingResponse(io.BytesIO(data), media_type=DOCX_MIME, headers=headers)
+
+
+@app.post("/generate-diplomes-batch")
+def generate_diplomes_batch(req: DiplomeBatchRequest):
+    """Sélection multiple côté front : génère un diplôme par candidat et
+    renvoie une seule archive .zip contenant tous les .docx."""
+    zip_buf = io.BytesIO()
+    used_names: Dict[str, int] = {}
+
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for item in req.diplomes:
+            filename, data = _generate_one(item)
+
+            # Évite d'écraser un fichier si deux candidats ont même
+            # matricule + nom (cas limite mais on préfère ne rien perdre).
+            if filename in used_names:
+                used_names[filename] += 1
+                stem, ext = filename[:-5], filename[-5:]
+                filename = f"{stem}_{used_names[filename]}{ext}"
+            else:
+                used_names[filename] = 0
+
+            zf.writestr(filename, data)
+
+    zip_buf.seek(0)
+    headers = {
+        "Content-Disposition": 'attachment; filename="diplomes.zip"',
+        "Access-Control-Expose-Headers": "Content-Disposition",
+    }
+    return StreamingResponse(zip_buf, media_type="application/zip", headers=headers)
 
 
 @app.exception_handler(Exception)
