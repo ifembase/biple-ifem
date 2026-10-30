@@ -111,6 +111,21 @@ class TestListe(unittest.TestCase):
         with self.assertRaises(ValueError):
             docgen.generate("liste", "L2", dict(etudiants=[]))
 
+    def test_date_naissance_approximative(self):
+        """« vers 1990 » : le mot « le » du modèle est retiré (« Né(e) vers 1990 »)."""
+        import io, re, zipfile
+        def texte(b):
+            xml = zipfile.ZipFile(io.BytesIO(b)).read("word/document.xml").decode("utf-8")
+            return re.sub(r"<[^>]+>", "", xml)
+        for kind in ("diplome", "authentification"):
+            for code in docgen.NIVEAUX:
+                base = dict(matricule="A 1", nom="X Y", mention="Bien", lieu_naissance="Tana")
+                t = texte(docgen.generate(kind, code, dict(base, date_naissance="vers 1990")))
+                self.assertRegex(t, r"[Nn]é\(e\)\s+vers 1990")
+                self.assertNotRegex(t, r"[Nn]é\(e\)\s+le\s+vers")
+                t = texte(docgen.generate(kind, code, dict(base, date_naissance="16/02/1974")))
+                self.assertRegex(t, r"[Nn]é\(e\)\s+le\s+16/02/1974")
+
 
 if __name__ == "__main__":
     unittest.main()

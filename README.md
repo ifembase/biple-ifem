@@ -102,7 +102,7 @@ Lots : `POST /generate-diplomes-batch` `{"diplomes": [...]}` ·
 | `matricule` | `"AVD 004"` | le « /26 » est déjà dans le template |
 | `nom` | `"RAHARISOA Hyama Bakoly Ollivine"` | |
 | `mention` | `"Bien"` | |
-| `date_naissance` | `"16/02/1974"` | **JJ/MM/AAAA** obligatoire |
+| `date_naissance` | `"16/02/1974"` ou `"vers 1990"` | **JJ/MM/AAAA**, ou date approximative `vers AAAA` (`1990` et `vers l'année 1990` sont normalisés en `vers 1990`) : le document imprime alors « Né(e) vers 1990 » (le « le » du modèle est retiré) |
 | `lieu_naissance` | `"Befelatanana ANTANANARIVO IV"` | |
 | `bassin` | `"AVARADRANO"` | optionnel, non imprimé |
 

@@ -47,6 +47,11 @@ NIVEAU_ALIASES: Dict[str, str] = {
 }
 
 DATE_RE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
+# Date approximative (personnes dont seul l'âge approximatif est connu) :
+# « vers 1990 », « Vers 1990 », « vers l'année 1990 » ou simplement « 1990 ».
+# Normalisée en « vers AAAA » ; le modèle imprime alors « Né(e) vers 1990 »
+# (le mot « le » du modèle est retiré par docgen).
+DATE_APPROX_RE = re.compile(r"^(?:vers\s+(?:l['’]\s*ann[ée]e\s+)?)?(\d{4})$", re.IGNORECASE)
 
 # Origine(s) autorisée(s) pour les appels CORS depuis le front. En prod,
 # définir la variable d'environnement ALLOWED_ORIGINS (séparées par des
@@ -77,7 +82,7 @@ class DiplomeRequest(BaseModel):
     matricule: str = Field(..., min_length=1)
     nom: str = Field(..., min_length=1, description="Nom et prénoms du/de la candidat(e)")
     mention: str = Field(..., min_length=1, description="Ex. Passable, Assez-bien, Bien, Très-bien")
-    date_naissance: str = Field(..., description="Format JJ/MM/AAAA")
+    date_naissance: str = Field(..., description="JJ/MM/AAAA, ou date approximative « vers AAAA » (ou « AAAA »)")
     lieu_naissance: str = Field(..., min_length=1)
     bassin: Optional[str] = Field(None, description="Optionnel, informatif uniquement (non imprimé)")
 
@@ -90,9 +95,12 @@ class DiplomeRequest(BaseModel):
     @classmethod
     def _date_valide(cls, v: str) -> str:
         v = v.strip()
-        if not DATE_RE.match(v):
-            raise ValueError("date_naissance doit être au format JJ/MM/AAAA")
-        return v
+        if DATE_RE.match(v):
+            return v
+        m = DATE_APPROX_RE.match(v)
+        if m:
+            return f"vers {m.group(1)}"
+        raise ValueError("date_naissance doit être au format JJ/MM/AAAA, ou « vers AAAA » si la date exacte est inconnue")
 
     @field_validator("matricule", "nom", "mention", "lieu_naissance")
     @classmethod

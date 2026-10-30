@@ -107,7 +107,26 @@ def count_variables(xml: str) -> int:
     return len(_VAR_RE.findall("".join(texts)))
 
 
-def fill_xml(xml: str, values: List[str]) -> str:
+def _retirer_le(new: List[str], first: int, a_first: int) -> None:
+    """Retire le mot « le » (et ses espaces) juste avant la variable, pour
+    transformer « Né(e) le {{date}} » en « Né(e) vers 1990 » quand la date est
+    approximative. Le texte précédant la variable peut être réparti sur
+    plusieurs runs ; `new` est modifié sur place."""
+    j = first
+    head, tail = new[j][:a_first], new[j][a_first:]
+    while head.strip() == "" and j > 0:
+        new[j] = head + tail
+        j -= 1
+        head, tail = new[j], ""
+    m = re.search(r"(^|[^\wÀ-ÿ])le\s*$", head, re.IGNORECASE)
+    if m:
+        head = head[:m.start()] + m.group(1)
+        if not head.endswith(" "):
+            head += " "
+    new[j] = head + tail
+
+
+def fill_xml(xml: str, values: List[str], sans_le: Optional[set] = None) -> str:
     """Remplace, dans l'ordre d'apparition, chaque {{...}} par la valeur
     correspondante. L'exemple contenu entre les accolades est supprimé."""
     items, texts = _scan(xml)
@@ -125,7 +144,7 @@ def fill_xml(xml: str, values: List[str]) -> str:
     new = list(texts)
     # On traite de la dernière variable à la première : les modifications
     # ne décalent ainsi jamais les positions des variables restantes.
-    for m, val in reversed(list(zip(spans, values))):
+    for idx_var, (m, val) in reversed(list(enumerate(zip(spans, values)))):
         s, e = m.start(), m.end()
         inner_s, inner_e = s + 2, e - 2
         overlap = [i for i in range(len(texts)) if starts[i] < e and ends[i] > s]
@@ -144,6 +163,9 @@ def fill_xml(xml: str, values: List[str]) -> str:
             b = min(ends[i], e) - starts[i]
             ins = val if i == host else ""
             new[i] = new[i][:a] + ins + new[i][b:]
+        if sans_le and idx_var in sans_le:
+            first = overlap[0]
+            _retirer_le(new, first, max(starts[first], s) - starts[first])
 
     if _VAR_RE.search("".join(new)) or "{{" in "".join(new) or "}}" in "".join(new):
         raise ValueError("accolades {{ }} résiduelles après remplissage")
@@ -289,8 +311,8 @@ class Template:
                 f"l'ordre déclaré dans docgen.py (voir README.md)."
             )
 
-    def render(self, values: List[str]) -> bytes:
-        new_xml = fill_xml(self.xml, values)
+    def render(self, values: List[str], sans_le: Optional[set] = None) -> bytes:
+        new_xml = fill_xml(self.xml, values, sans_le)
         src = zipfile.ZipFile(io.BytesIO(self.raw))
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as out_zip:
@@ -341,6 +363,9 @@ def loaded() -> Dict[str, List[str]]:
     for (kind, code) in _REGISTRY:
         res.setdefault(kind, []).append(code)
     return {k: sorted(v) for k, v in res.items()}
+
+
+_DATE_COMPLETE_RE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
 
 
 def liste_capacite(code: str) -> int:
@@ -464,4 +489,9 @@ def generate(kind: str, code: str, data: dict) -> bytes:
         values = _liste_values(tpl, data)
     else:
         values = [str(data[k]).strip() for k in tpl.order]
-    return tpl.render(values)
+    # Date de naissance approximative (« vers 1990 ») : « Né(e) le » devient « Né(e) ».
+    sans_le = {
+        i for i, k in enumerate(tpl.order)
+        if k == "date_naissance" and not _DATE_COMPLETE_RE.match(values[i])
+    }
+    return tpl.render(values, sans_le)
