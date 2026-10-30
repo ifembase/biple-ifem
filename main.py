@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Backend de génération de diplômes IFEM.
+Backend de génération de documents IFEM : diplômes, authentifications et
+relevés de notes.
 
 Expose une API HTTP (FastAPI) qui remplit les templates Word (.docx) fournis
 (variables entourées de {{}}) avec les données d'un(e) candidat(e) et renvoie
-directement le fichier .docx généré en téléchargement.
+directement le fichier .docx généré en téléchargement (ou une archive .zip
+pour les générations en lot).
+
+Le moteur de remplissage est dans docgen.py.
 
 Lancement local :
     uvicorn main:app --reload
@@ -17,40 +21,26 @@ import os
 import re
 import unicodedata
 import zipfile
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple, Union
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
+import docgen
+
 # --------------------------------------------------------------------------
 # Configuration
 # --------------------------------------------------------------------------
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
-
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-
-# Pour chaque niveau : fichier template + ordre des variables {{}} telles
-# qu'elles apparaissent DANS LE DOCUMENT (déterminé une fois par inspection
-# du template — voir README.md "Ajouter un nouveau template"). Le champ
-# "nom" apparaît deux fois dans les templates L2/L3/M1/M2 (signature en
-# filigrane + ligne "Délivré à").
-LEVELS: Dict[str, dict] = {
-    "L1": dict(file="template_L1.docx", order=["matricule", "nom", "mention", "date", "lieu"]),
-    "L2": dict(file="template_L2.docx", order=["matricule", "nom", "nom", "mention", "date", "lieu"]),
-    "L3": dict(file="template_L3.docx", order=["matricule", "nom", "nom", "mention", "date", "lieu"]),
-    "M1": dict(file="template_M1.docx", order=["matricule", "nom", "nom", "mention", "date", "lieu"]),
-    "M2": dict(file="template_M2.docx", order=["matricule", "nom", "nom", "mention", "date", "lieu"]),
-}
 
 # Alias acceptés pour "niveau" côté front (les intitulés de la feuille de
 # notes source ne correspondent pas toujours au nom du template).
 NIVEAU_ALIASES: Dict[str, str] = {
     "L1": "L1", "DT3": "L1", "DT-SE": "L1",
-    "L2": "L2", "DTS": "L2",
+    "L2": "L2", "DTS": "L2", "DTS-SE": "L2", "DTS – SE": "L2",
     "L3": "L3",
     "M1": "M1",
     "M2": "M2",
@@ -63,86 +53,6 @@ DATE_RE = re.compile(r"^\d{2}/\d{2}/\d{4}$")
 # virgules) plutôt que de laisser "*".
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 
-# --------------------------------------------------------------------------
-# Chargement des templates (une fois, au démarrage)
-# --------------------------------------------------------------------------
-
-_template_cache: Dict[str, dict] = {}
-
-
-def _load_templates() -> None:
-    for code, cfg in LEVELS.items():
-        path = os.path.join(TEMPLATES_DIR, cfg["file"])
-        if not os.path.isfile(path):
-            raise RuntimeError(f"Template introuvable : {path}")
-        with open(path, "rb") as f:
-            raw = f.read()
-        zf = zipfile.ZipFile(io.BytesIO(raw))
-        xml = zf.read("word/document.xml").decode("utf-8")
-        found = len(re.findall(r"\{\{.*?\}\}", xml, re.DOTALL))
-        expected = len(cfg["order"])
-        if found != expected:
-            raise RuntimeError(
-                f"Template {code} ({cfg['file']}) : {found} variable(s) {{}} trouvée(s) "
-                f"dans le document, {expected} attendue(s). Le template a peut-être été "
-                f"modifié après édition dans Word (les runs XML ont pu se refragmenter) — "
-                f"voir README.md « Ajouter / mettre à jour un template »."
-            )
-        _template_cache[code] = {
-            "raw": raw,
-            "xml": xml,
-            "names": [i for i in zf.namelist()],
-            "infolist": zf.infolist(),
-        }
-
-
-# --------------------------------------------------------------------------
-# Remplissage du template
-# --------------------------------------------------------------------------
-
-def _xml_escape(s: str) -> str:
-    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
-def _fill_xml(xml: str, values: List[str]) -> str:
-    """Remplace, dans l'ordre d'apparition, chaque {{...}} par la valeur
-    correspondante — en conservant le formatage (gras, couleur, taille...)
-    porté par le run qui contenait la valeur d'origine."""
-    pattern = re.compile(r"\{\{(.*?)\}\}", re.DOTALL)
-    matches = list(pattern.finditer(xml))
-    if len(matches) != len(values):
-        raise ValueError(f"{len(matches)} variable(s) trouvée(s), {len(values)} valeur(s) fournie(s)")
-
-    out = []
-    last_end = 0
-    for m, new_val in zip(matches, values):
-        out.append(xml[last_end:m.start()])
-        inner = m.group(1)
-        last_gt = inner.rfind(">")
-        if last_gt == -1:
-            out.append(_xml_escape(new_val))
-        else:
-            out.append(inner[: last_gt + 1] + _xml_escape(new_val))
-        last_end = m.end()
-    out.append(xml[last_end:])
-    return "".join(out)
-
-
-def _build_docx_bytes(code: str, values: List[str]) -> io.BytesIO:
-    cfg = _template_cache[code]
-    new_xml = _fill_xml(cfg["xml"], values)
-    orig_zip = zipfile.ZipFile(io.BytesIO(cfg["raw"]))
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as out_zip:
-        for item in orig_zip.infolist():
-            data = orig_zip.read(item.filename)
-            if item.filename == "word/document.xml":
-                data = new_xml.encode("utf-8")
-            out_zip.writestr(item, data)
-    buf.seek(0)
-    return buf
-
 
 def _slugify(s: str) -> str:
     s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
@@ -150,26 +60,31 @@ def _slugify(s: str) -> str:
     return s or "x"
 
 
+def _normaliser_niveau(v: str) -> str:
+    code = NIVEAU_ALIASES.get(v.strip().upper())
+    if code is None:
+        raise ValueError(f"niveau inconnu : {v!r}. Valeurs acceptées : {sorted(NIVEAU_ALIASES)}")
+    return code
+
+
 # --------------------------------------------------------------------------
-# Schéma de requête
+# Schémas de requête
 # --------------------------------------------------------------------------
 
 class DiplomeRequest(BaseModel):
+    """Champs communs au diplôme et à l'authentification."""
     niveau: str = Field(..., description="L1, L2, L3, M1, M2 (ou DT3, DTS)")
     matricule: str = Field(..., min_length=1)
     nom: str = Field(..., min_length=1, description="Nom et prénoms du/de la candidat(e)")
     mention: str = Field(..., min_length=1, description="Ex. Passable, Assez-bien, Bien, Très-bien")
     date_naissance: str = Field(..., description="Format JJ/MM/AAAA")
     lieu_naissance: str = Field(..., min_length=1)
-    bassin: str | None = Field(None, description="Optionnel, informatif uniquement (non imprimé)")
+    bassin: Optional[str] = Field(None, description="Optionnel, informatif uniquement (non imprimé)")
 
     @field_validator("niveau")
     @classmethod
     def _niveau_connu(cls, v: str) -> str:
-        code = NIVEAU_ALIASES.get(v.strip().upper())
-        if code is None:
-            raise ValueError(f"niveau inconnu : {v!r}. Valeurs acceptées : {sorted(NIVEAU_ALIASES)}")
-        return code
+        return _normaliser_niveau(v)
 
     @field_validator("date_naissance")
     @classmethod
@@ -188,10 +103,85 @@ class DiplomeRequest(BaseModel):
         return v
 
 
+class AuthentificationRequest(DiplomeRequest):
+    """Mêmes champs que le diplôme : nom, date/lieu de naissance, matricule, mention."""
+
+
+Nombre = Union[float, str]  # 15.5, "15.5" ou "15,5" acceptés
+
+
+class ReleveRequest(BaseModel):
+    niveau: str = Field(..., description="L1, L2, L3, M1, M2 (ou DT3, DTS)")
+    matricule: str = Field(..., min_length=1)
+    nom: str = Field(..., min_length=1, description="Nom et prénoms du/de la candidat(e)")
+    mention: str = Field(..., min_length=1)
+    notes: List[Nombre] = Field(
+        ..., description="Note /20 de chaque module, dans l'ordre du relevé (voir GET /niveaux)"
+    )
+    note_soutenance: Nombre = Field(..., description="Note de soutenance /20")
+    # Optionnels : calculés par le backend s'ils sont absents.
+    notes_ponderees: Optional[List[Nombre]] = Field(
+        None, description="« Note avec coeff » de chaque module (défaut : note × coefficient)"
+    )
+    total: Optional[Nombre] = Field(None, description="Défaut : somme des notes pondérées")
+    moyenne: Optional[Nombre] = Field(None, description="Défaut : total / somme des coefficients")
+    moyenne_generale: Optional[Nombre] = Field(None, description="Défaut : (moyenne + soutenance) / 2")
+    bassin: Optional[str] = Field(None, description="Optionnel, informatif uniquement (non imprimé)")
+
+    @field_validator("niveau")
+    @classmethod
+    def _niveau_connu(cls, v: str) -> str:
+        return _normaliser_niveau(v)
+
+    @field_validator("matricule", "nom", "mention")
+    @classmethod
+    def _non_vide(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("champ vide non autorisé")
+        return v
+
+
+class EtudiantListe(BaseModel):
+    matricule: str = Field(..., min_length=1)
+    nom: str = Field(..., min_length=1, description="Nom et prénoms")
+
+    @field_validator("matricule", "nom")
+    @classmethod
+    def _non_vide(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("champ vide non autorisé")
+        return v
+
+
+class ListeRequest(BaseModel):
+    """Une liste des admis : au maximum N étudiants (N = capacité du template,
+    5 aujourd'hui, voir GET /niveaux). Les lignes non remplies sont imprimées « _ »."""
+    niveau: str = Field(..., description="L1, L2, L3, M1, M2 (ou DT3, DTS)")
+    etudiants: List[EtudiantListe] = Field(..., min_length=1, description="Les étudiants sélectionnés, dans l'ordre d'impression")
+
+    @field_validator("niveau")
+    @classmethod
+    def _niveau_connu(cls, v: str) -> str:
+        return _normaliser_niveau(v)
+
+
 class DiplomeBatchRequest(BaseModel):
-    """Requête pour générer plusieurs diplômes d'un coup (sélection multiple
-    côté front) et les récupérer dans une seule archive .zip."""
+    """Plusieurs diplômes d'un coup, récupérés dans une seule archive .zip."""
     diplomes: List[DiplomeRequest] = Field(..., min_length=1)
+
+
+class AuthentificationBatchRequest(BaseModel):
+    authentifications: List[AuthentificationRequest] = Field(..., min_length=1)
+
+
+class ReleveBatchRequest(BaseModel):
+    releves: List[ReleveRequest] = Field(..., min_length=1)
+
+
+class ListeBatchRequest(BaseModel):
+    listes: List[ListeRequest] = Field(..., min_length=1)
 
 
 # --------------------------------------------------------------------------
@@ -199,9 +189,9 @@ class DiplomeBatchRequest(BaseModel):
 # --------------------------------------------------------------------------
 
 app = FastAPI(
-    title="IFEM - Génération de diplômes",
-    description="Génère un diplôme .docx à partir d'un template et des données d'un(e) candidat(e).",
-    version="1.0.0",
+    title="IFEM - Génération de documents",
+    description="Génère diplômes, authentifications et relevés de notes (.docx) à partir des templates.",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -215,58 +205,67 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup() -> None:
-    _load_templates()
+    docgen.load_all()
 
 
 @app.get("/")
 def root():
-    return {"status": "ok", "service": "ifem-diplomes-backend", "niveaux": sorted(LEVELS)}
+    return {
+        "status": "ok",
+        "service": "ifem-documents-backend",
+        "niveaux": docgen.NIVEAUX,
+        "documents": ["diplome", "authentification", "releve", "liste"],
+    }
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "templates_charges": sorted(_template_cache)}
+    return {"status": "ok", "templates_charges": docgen.loaded()}
 
 
 @app.get("/niveaux")
 def niveaux():
-    """Liste des niveaux disponibles et des champs attendus — utile pour construire
-    dynamiquement le formulaire côté front."""
+    """Niveaux disponibles, champs attendus et modules de chaque relevé — utile
+    pour construire dynamiquement les formulaires côté front."""
     return {
-        "niveaux": sorted(LEVELS),
+        "niveaux": docgen.NIVEAUX,
         "alias_acceptes": NIVEAU_ALIASES,
-        "champs_requis": ["niveau", "matricule", "nom", "mention", "date_naissance", "lieu_naissance"],
+        "champs_requis": {
+            "diplome": ["niveau", "matricule", "nom", "mention", "date_naissance", "lieu_naissance"],
+            "authentification": ["niveau", "matricule", "nom", "mention", "date_naissance", "lieu_naissance"],
+            "releve": ["niveau", "matricule", "nom", "mention", "notes", "note_soutenance"],
+            "liste": ["niveau", "etudiants[{matricule, nom}]"],
+        },
+        "liste_capacite": {code: docgen.liste_capacite(code) for code in docgen.NIVEAUX},
+        "releve_modules": {code: docgen.releve_modules(code) for code in docgen.NIVEAUX},
     }
 
 
-def _generate_one(req: DiplomeRequest) -> tuple[str, bytes]:
-    """Génère un diplôme pour UN candidat et renvoie (nom_fichier, contenu_docx)."""
+# ---- helpers -------------------------------------------------------------
+
+def _payload(req: BaseModel) -> dict:
+    return req.model_dump()
+
+
+def _generate_one(kind: str, req: BaseModel) -> Tuple[str, bytes]:
+    """Génère un document pour UN candidat et renvoie (nom_fichier, contenu_docx)."""
     code = NIVEAU_ALIASES[req.niveau.strip().upper()]
-    if code not in _template_cache:
-        raise HTTPException(500, f"Template non chargé pour le niveau {code}")
-
-    values_by_field = {
-        "matricule": req.matricule,
-        "nom": req.nom,
-        "mention": req.mention,
-        "date": req.date_naissance,
-        "lieu": req.lieu_naissance,
-    }
-    order = LEVELS[code]["order"]
-    values = [values_by_field[k] for k in order]
-
+    if kind == "liste":
+        first = req.etudiants[0]
+        label = f"{req.niveau} / {first.matricule} ({first.nom})"
+        stem = f"{kind}_{code}_{_slugify(first.matricule)}_{len(req.etudiants)}etu"
+    else:
+        label = f"{req.matricule} ({req.nom})"
+        stem = f"{kind}_{code}_{_slugify(req.matricule)}_{_slugify(req.nom)}"
     try:
-        buf = _build_docx_bytes(code, values)
+        data = docgen.generate(kind, code, _payload(req))
     except ValueError as e:
-        raise HTTPException(500, f"{req.matricule} ({req.nom}) : {e}")
+        # Données invalides (ex. trop d'étudiants, mauvais nombre de notes) -> 422 explicite
+        raise HTTPException(422, f"{label} : {e}")
+    return stem + ".docx", data
 
-    filename = f"diplome_{code}_{_slugify(req.matricule)}_{_slugify(req.nom)}.docx"
-    return filename, buf.getvalue()
 
-
-@app.post("/generate-diplome")
-def generate_diplome(req: DiplomeRequest):
-    filename, data = _generate_one(req)
+def _single_response(filename: str, data: bytes) -> StreamingResponse:
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
         "Access-Control-Expose-Headers": "Content-Disposition",
@@ -274,34 +273,82 @@ def generate_diplome(req: DiplomeRequest):
     return StreamingResponse(io.BytesIO(data), media_type=DOCX_MIME, headers=headers)
 
 
-@app.post("/generate-diplomes-batch")
-def generate_diplomes_batch(req: DiplomeBatchRequest):
-    """Sélection multiple côté front : génère un diplôme par candidat et
-    renvoie une seule archive .zip contenant tous les .docx."""
+def _batch_response(kind: str, items: List[BaseModel], zip_name: str) -> StreamingResponse:
     zip_buf = io.BytesIO()
     used_names: Dict[str, int] = {}
-
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for item in req.diplomes:
-            filename, data = _generate_one(item)
-
+        for item in items:
+            filename, data = _generate_one(kind, item)
             # Évite d'écraser un fichier si deux candidats ont même
             # matricule + nom (cas limite mais on préfère ne rien perdre).
-            if filename in used_names:
-                used_names[filename] += 1
-                stem, ext = filename[:-5], filename[-5:]
-                filename = f"{stem}_{used_names[filename]}{ext}"
+            key = filename
+            if key in used_names:
+                used_names[key] += 1
+                filename = f"{key[:-5]}_{used_names[key]}.docx"
             else:
-                used_names[filename] = 0
-
+                used_names[key] = 0
             zf.writestr(filename, data)
-
     zip_buf.seek(0)
     headers = {
-        "Content-Disposition": 'attachment; filename="diplomes.zip"',
+        "Content-Disposition": f'attachment; filename="{zip_name}"',
         "Access-Control-Expose-Headers": "Content-Disposition",
     }
     return StreamingResponse(zip_buf, media_type="application/zip", headers=headers)
+
+
+# ---- diplômes ------------------------------------------------------------
+
+@app.post("/generate-diplome")
+def generate_diplome(req: DiplomeRequest):
+    filename, data = _generate_one("diplome", req)
+    return _single_response(filename, data)
+
+
+@app.post("/generate-diplomes-batch")
+def generate_diplomes_batch(req: DiplomeBatchRequest):
+    """Sélection multiple côté front : un diplôme par candidat, dans un .zip."""
+    return _batch_response("diplome", req.diplomes, "diplomes.zip")
+
+
+# ---- authentifications ---------------------------------------------------
+
+@app.post("/generate-authentification")
+def generate_authentification(req: AuthentificationRequest):
+    filename, data = _generate_one("authentification", req)
+    return _single_response(filename, data)
+
+
+@app.post("/generate-authentifications-batch")
+def generate_authentifications_batch(req: AuthentificationBatchRequest):
+    return _batch_response("authentification", req.authentifications, "authentifications.zip")
+
+
+# ---- relevés de notes ----------------------------------------------------
+
+@app.post("/generate-releve")
+def generate_releve(req: ReleveRequest):
+    filename, data = _generate_one("releve", req)
+    return _single_response(filename, data)
+
+
+@app.post("/generate-releves-batch")
+def generate_releves_batch(req: ReleveBatchRequest):
+    return _batch_response("releve", req.releves, "releves.zip")
+
+
+# ---- listes des admis ----------------------------------------------------
+
+@app.post("/generate-liste")
+def generate_liste(req: ListeRequest):
+    """Une liste par appel : au plus N étudiants (422 au-delà), « _ » pour les
+    lignes restantes si moins de N."""
+    filename, data = _generate_one("liste", req)
+    return _single_response(filename, data)
+
+
+@app.post("/generate-listes-batch")
+def generate_listes_batch(req: ListeBatchRequest):
+    return _batch_response("liste", req.listes, "listes.zip")
 
 
 @app.exception_handler(Exception)
