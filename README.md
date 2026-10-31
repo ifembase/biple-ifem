@@ -272,3 +272,12 @@ template, lancez `python -m unittest discover -s tests -v`.
   qu'envoyée. C'est au front de ne proposer « Générer » que pour les candidat(e)s
   admis(es) avec un dossier complet.
 - Une liste est limitée à la capacité de son template (5) : le découpage d'une sélection plus grande en plusieurs listes doit se faire côté front (un appel par groupe de 5, ou `/generate-listes-batch`).
+
+## Performances
+
+Les templates de diplôme contenaient un aperçu de fichier (`docProps/thumbnail.emf`, 22 Mo
+décompressé) inutile pour la génération. Il est retiré en mémoire au chargement (vos fichiers
+`.docx` ne sont pas modifiés) : un diplôme passe de ~0,75 s à ~0,04 s de génération et de
+4,7 Mo à ~1,6 Mo de téléchargement. Les lots (`*-batch`) sont assemblés sans recompression.
+Sur l'offre gratuite de Render, le service s'endort après ~15 min d'inactivité : la première
+requête qui suit peut prendre 30 à 60 s (démarrage à froid), indépendamment du code.

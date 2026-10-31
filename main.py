@@ -284,7 +284,9 @@ def _single_response(filename: str, data: bytes) -> StreamingResponse:
 def _batch_response(kind: str, items: List[BaseModel], zip_name: str) -> StreamingResponse:
     zip_buf = io.BytesIO()
     used_names: Dict[str, int] = {}
-    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+    # ZIP_STORED : les .docx sont déjà des archives compressées, les recompresser
+    # ne gagnerait presque rien et coûterait plusieurs secondes sur un gros lot.
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_STORED) as zf:
         for item in items:
             filename, data = _generate_one(kind, item)
             # Évite d'écraser un fichier si deux candidats ont même

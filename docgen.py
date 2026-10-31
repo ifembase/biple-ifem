@@ -270,6 +270,35 @@ def _prepare_liste(xml: str) -> Tuple[str, List[Tuple[int, str]]]:
     return _TR_RE.sub(fix_row, xml), fields
 
 # --------------------------------------------------------------------------
+# Lecture d'un template .docx
+# --------------------------------------------------------------------------
+
+_THUMBNAIL_REL_RE = re.compile(r"<Relationship\b[^>]*metadata/thumbnail[^>]*/>")
+
+
+def _lire_parties(raw: bytes) -> List[Tuple[str, tuple, int, int, bytes]]:
+    """Lit un .docx en mémoire : [(nom, date, compression, attributs, contenu)].
+
+    L'aperçu de fichier `docProps/thumbnail.emf` est retiré (et sa référence
+    dans `_rels/.rels`). Dans les templates de diplôme il pèse 22 Mo (3 Mo
+    compressé) : il n'est utilisé que par l'explorateur de fichiers pour
+    afficher une miniature — et affichait celle du modèle d'exemple. Le
+    garder obligeait à le décompresser/recompresser à chaque diplôme et à le
+    faire télécharger (diplôme de 4,7 Mo au lieu d'environ 1,6 Mo). Word le
+    régénère à la première sauvegarde."""
+    parts = []
+    with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+        for item in zf.infolist():
+            if item.filename.lower().startswith("docprops/thumbnail"):
+                continue
+            data = zf.read(item.filename)
+            if item.filename == "_rels/.rels":
+                data = _THUMBNAIL_REL_RE.sub("", data.decode("utf-8")).encode("utf-8")
+            parts.append((item.filename, item.date_time, item.compress_type, item.external_attr, data))
+    return parts
+
+
+# --------------------------------------------------------------------------
 # Templates chargés en mémoire
 # --------------------------------------------------------------------------
 
@@ -280,9 +309,9 @@ class Template:
         if not os.path.isfile(path):
             raise RuntimeError(f"Template introuvable : {path}")
         with open(path, "rb") as f:
-            self.raw = f.read()
-        zf = zipfile.ZipFile(io.BytesIO(self.raw))
-        self.xml = zf.read("word/document.xml").decode("utf-8")
+            raw = f.read()
+        self.parts = _lire_parties(raw)  # décompressées une fois pour toutes, sans l'aperçu
+        self.xml = next(d for (n, _, _, _, d) in self.parts if n == "word/document.xml").decode("utf-8")
         self.relpath = relpath
         self.modules: List[Tuple[str, Decimal]] = []
         self.capacity = 0  # nombre de lignes d'une liste
@@ -312,15 +341,18 @@ class Template:
             )
 
     def render(self, values: List[str], sans_le: Optional[set] = None) -> bytes:
-        new_xml = fill_xml(self.xml, values, sans_le)
-        src = zipfile.ZipFile(io.BytesIO(self.raw))
+        new_xml = fill_xml(self.xml, values, sans_le).encode("utf-8")
         buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as out_zip:
-            for item in src.infolist():
-                data = src.read(item.filename)
-                if item.filename == "word/document.xml":
-                    data = new_xml.encode("utf-8")
-                out_zip.writestr(item, data)
+        # compresslevel 4 : ~2x plus rapide que le défaut (6) pour quelques % de
+        # taille en plus. Les images JPEG restent "stockées" (déjà compressées).
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=4) as out_zip:
+            for name, date_time, compress_type, external_attr, data in self.parts:
+                # Un ZipInfo neuf à chaque appel : writestr() le modifie, et
+                # plusieurs requêtes peuvent s'exécuter en parallèle (threads).
+                zi = zipfile.ZipInfo(name, date_time)
+                zi.compress_type = compress_type
+                zi.external_attr = external_attr
+                out_zip.writestr(zi, new_xml if name == "word/document.xml" else data)
         return buf.getvalue()
 
 
