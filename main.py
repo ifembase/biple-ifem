@@ -19,14 +19,13 @@ Déploiement : voir README.md (Render).
 import io
 import os
 import re
-import unicodedata
 import zipfile
 from typing import Dict, List, Optional, Tuple, Union
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 import docgen
 
@@ -59,10 +58,7 @@ DATE_APPROX_RE = re.compile(r"^(?:vers\s+(?:l['’]\s*ann[ée]e\s+)?)?(\d{4})$",
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 
 
-def _slugify(s: str) -> str:
-    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
-    s = re.sub(r"[^A-Za-z0-9]+", "_", s).strip("_")
-    return s or "x"
+_slugify = docgen.slugify
 
 
 def _normaliser_niveau(v: str) -> str:
@@ -84,7 +80,17 @@ class DiplomeRequest(BaseModel):
     mention: str = Field(..., min_length=1, description="Ex. Passable, Assez-bien, Bien, Très-bien")
     date_naissance: str = Field(..., description="JJ/MM/AAAA, ou date approximative « vers AAAA » (ou « AAAA »)")
     lieu_naissance: str = Field(..., min_length=1)
-    bassin: Optional[str] = Field(None, description="Optionnel, informatif uniquement (non imprimé)")
+    bassin: Optional[str] = Field(None, description="Nom du bassin ; nomme le .zip d'un lot (non imprimé)")
+    # Niveau tel qu'envoyé par le front (« DT3 », « DTS »...), avant normalisation
+    # en L1..M2 : sert à nommer le dossier du niveau dans le .zip d'un lot.
+    niveau_libelle: Optional[str] = Field(None, description="Rempli automatiquement depuis 'niveau'")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _garder_libelle_niveau(cls, data):
+        if isinstance(data, dict) and not data.get("niveau_libelle") and isinstance(data.get("niveau"), str):
+            data = {**data, "niveau_libelle": data["niveau"].strip()}
+        return data
 
     @field_validator("niveau")
     @classmethod
@@ -176,8 +182,10 @@ class ListeRequest(BaseModel):
 
 
 class DiplomeBatchRequest(BaseModel):
-    """Plusieurs diplômes d'un coup, récupérés dans une seule archive .zip."""
+    """Plusieurs diplômes d'un coup, récupérés dans une seule archive .zip :
+    un dossier par niveau, nommée d'après le bassin (en majuscules)."""
     diplomes: List[DiplomeRequest] = Field(..., min_length=1)
+    bassin: Optional[str] = Field(None, description="Défaut : le 'bassin' des diplômes")
 
 
 class AuthentificationBatchRequest(BaseModel):
@@ -281,24 +289,17 @@ def _single_response(filename: str, data: bytes) -> StreamingResponse:
     return StreamingResponse(io.BytesIO(data), media_type=DOCX_MIME, headers=headers)
 
 
-def _batch_response(kind: str, items: List[BaseModel], zip_name: str) -> StreamingResponse:
-    zip_buf = io.BytesIO()
-    used_names: Dict[str, int] = {}
-    # ZIP_STORED : les .docx sont déjà des archives compressées, les recompresser
-    # ne gagnerait presque rien et coûterait plusieurs secondes sur un gros lot.
-    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_STORED) as zf:
-        for item in items:
-            filename, data = _generate_one(kind, item)
-            # Évite d'écraser un fichier si deux candidats ont même
-            # matricule + nom (cas limite mais on préfère ne rien perdre).
-            key = filename
-            if key in used_names:
-                used_names[key] += 1
-                filename = f"{key[:-5]}_{used_names[key]}.docx"
-            else:
-                used_names[key] = 0
-            zf.writestr(filename, data)
-    zip_buf.seek(0)
+def _batch_response(kind: str, items: List[BaseModel], zip_name: str, par_niveau: bool = False) -> StreamingResponse:
+    entrees = []
+    for item in items:
+        filename, data = _generate_one(kind, item)
+        dossier = None
+        if par_niveau:
+            # Libellé du front (DT3, DTS...) si connu, sinon le code normalisé.
+            libelle = getattr(item, "niveau_libelle", None) or item.niveau
+            dossier = _slugify(libelle).upper()
+        entrees.append((dossier, filename, data))
+    zip_buf = io.BytesIO(docgen.assembler_zip(entrees))
     headers = {
         "Content-Disposition": f'attachment; filename="{zip_name}"',
         "Access-Control-Expose-Headers": "Content-Disposition",
@@ -316,8 +317,11 @@ def generate_diplome(req: DiplomeRequest):
 
 @app.post("/generate-diplomes-batch")
 def generate_diplomes_batch(req: DiplomeBatchRequest):
-    """Sélection multiple côté front : un diplôme par candidat, dans un .zip."""
-    return _batch_response("diplome", req.diplomes, "diplomes.zip")
+    """Sélection multiple côté front : un diplôme par candidat, dans un .zip.
+    Le .zip porte le nom du bassin en majuscules (ex. PORT_BERGE.zip) et contient
+    un dossier par niveau (DT3/, DTS/, L3/...) avec les diplômes du niveau."""
+    bassin = req.bassin or next((d.bassin for d in req.diplomes if d.bassin and d.bassin.strip()), None)
+    return _batch_response("diplome", req.diplomes, docgen.nom_archive(bassin, "DIPLOMES"), par_niveau=True)
 
 
 # ---- authentifications ---------------------------------------------------

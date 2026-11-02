@@ -23,6 +23,7 @@ Ce module n'a aucune dépendance externe (bibliothèque standard uniquement).
 import io
 import os
 import re
+import unicodedata
 import zipfile
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from html import unescape
@@ -502,6 +503,47 @@ def _liste_values(tpl: Template, data: dict) -> List[str]:
             vals[f"obs{i}"] = LISTE_OBS_VIDE
         vals[f"nb{i}"] = str(i + 1)
     return [vals[k] for k in tpl.order]
+
+
+# --------------------------------------------------------------------------
+# Nommage des fichiers et assemblage des archives .zip
+# --------------------------------------------------------------------------
+
+def slugify(s: str) -> str:
+    """Nom de fichier sûr : sans accents, lettres/chiffres, '_' comme séparateur."""
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+    s = re.sub(r"[^A-Za-z0-9]+", "_", s).strip("_")
+    return s or "x"
+
+
+def nom_archive(bassin: Optional[str], defaut: str = "DIPLOMES") -> str:
+    """Nom du .zip d'un lot : le nom du bassin en majuscules (« Port Bergé » ->
+    « PORT_BERGE.zip »), ou `defaut` si aucun bassin n'est connu."""
+    base = slugify(bassin).upper() if bassin and bassin.strip() else defaut
+    return f"{base}.zip"
+
+
+def assembler_zip(entrees: List[Tuple[Optional[str], str, bytes]]) -> bytes:
+    """Assemble des fichiers dans un .zip. `entrees` : [(dossier ou None,
+    nom de fichier, contenu)]. Un dossier est créé par valeur de `dossier`.
+    En cas de doublon de chemin, le fichier est suffixé _1, _2... (rien n'est écrasé).
+
+    ZIP_STORED : les .docx sont déjà des archives compressées, les recompresser
+    ne gagnerait presque rien et coûterait plusieurs secondes sur un gros lot."""
+    buf = io.BytesIO()
+    utilises: Dict[str, int] = {}
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
+        for dossier, filename, data in entrees:
+            chemin = f"{dossier}/{filename}" if dossier else filename
+            if chemin in utilises:
+                utilises[chemin] += 1
+                stem, ext = os.path.splitext(chemin)
+                final = f"{stem}_{utilises[chemin]}{ext}"
+            else:
+                utilises[chemin] = 0
+                final = chemin
+            zf.writestr(final, data)
+    return buf.getvalue()
 
 
 # --------------------------------------------------------------------------

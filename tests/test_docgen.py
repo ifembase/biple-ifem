@@ -127,5 +127,28 @@ class TestListe(unittest.TestCase):
                 self.assertRegex(t, r"[Nn]é\(e\)\s+le\s+16/02/1974")
 
 
+class TestArchive(unittest.TestCase):
+    def test_nom_archive(self):
+        self.assertEqual(docgen.nom_archive("Ambovombe"), "AMBOVOMBE.zip")
+        self.assertEqual(docgen.nom_archive("Port Bergé"), "PORT_BERGE.zip")
+        self.assertEqual(docgen.nom_archive("  nosy varika "), "NOSY_VARIKA.zip")
+        self.assertEqual(docgen.nom_archive(None), "DIPLOMES.zip")
+        self.assertEqual(docgen.nom_archive("   "), "DIPLOMES.zip")
+
+    def test_zip_un_dossier_par_niveau(self):
+        docgen.load_all()
+        base = dict(mention="Bien", date_naissance="05/07/1990", lieu_naissance="Tana")
+        entrees = []
+        for dossier, code, mat in [("DT3", "L1", "A 1"), ("DTS", "L2", "B 2"), ("DT3", "L1", "A 3"), ("DT3", "L1", "A 1")]:
+            data = docgen.generate("diplome", code, dict(base, matricule=mat, nom="NOM " + mat))
+            entrees.append((dossier, f"diplome_{code}_{docgen.slugify(mat)}.docx", data))
+        z = zipfile.ZipFile(io.BytesIO(docgen.assembler_zip(entrees)))
+        self.assertEqual(sorted(z.namelist()), [
+            "DT3/diplome_L1_A_1.docx", "DT3/diplome_L1_A_1_1.docx", "DT3/diplome_L1_A_3.docx",
+            "DTS/diplome_L2_B_2.docx"])  # doublon suffixé, rien d'écrasé
+        self.assertIsNone(z.testzip())
+        self.assertIn("NOM A 3", _texte(z.read("DT3/diplome_L1_A_3.docx")))
+
+
 if __name__ == "__main__":
     unittest.main()

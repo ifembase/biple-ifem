@@ -106,6 +106,23 @@ Lots : `POST /generate-diplomes-batch` `{"diplomes": [...]}` ·
 | `lieu_naissance` | `"Befelatanana ANTANANARIVO IV"` | |
 | `bassin` | `"AVARADRANO"` | optionnel, non imprimé |
 
+#### Archive d'un lot de diplômes
+
+`POST /generate-diplomes-batch` renvoie un `.zip` nommé d'après le **bassin en majuscules**
+(`"Port Bergé"` → `PORT_BERGE.zip` ; champ `bassin` du lot, sinon celui des diplômes ;
+`DIPLOMES.zip` si aucun bassin) et contenant **un dossier par niveau**, avec le libellé envoyé
+par le front :
+
+```
+PORT_BERGE.zip
+├── DT3/   diplome_L1_….docx
+├── DTS/   diplome_L2_….docx
+├── L3/    diplome_L3_….docx
+└── M1/    diplome_M1_….docx
+```
+
+Les lots d'authentifications, de relevés et de listes gardent une archive à plat.
+
 ### Relevé de notes
 
 `POST /generate-releve` · lot : `POST /generate-releves-batch` `{"releves": [...]}`
