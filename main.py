@@ -20,6 +20,7 @@ import io
 import os
 import re
 import zipfile
+from datetime import date
 from typing import Dict, List, Optional, Tuple, Union
 
 from fastapi import FastAPI, HTTPException
@@ -102,9 +103,16 @@ class DiplomeRequest(BaseModel):
     def _date_valide(cls, v: str) -> str:
         v = v.strip()
         if DATE_RE.match(v):
+            try:
+                jour, mois, annee = map(int, v.split("/"))
+                date(annee, mois, jour)
+            except ValueError:
+                raise ValueError("date_naissance doit etre une date du calendrier valide")
             return v
         m = DATE_APPROX_RE.match(v)
         if m:
+            if int(m.group(1)) == 0:
+                raise ValueError("L'annee de naissance doit etre superieure a zero")
             return f"vers {m.group(1)}"
         raise ValueError("date_naissance doit être au format JJ/MM/AAAA, ou « vers AAAA » si la date exacte est inconnue")
 
