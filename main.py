@@ -21,14 +21,15 @@ import os
 import re
 import zipfile
 from datetime import date
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel, Field, field_validator, model_validator
+from fastapi.responses import StreamingResponse, JSONResponse, Response
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 import docgen
+import liste_export
 
 # --------------------------------------------------------------------------
 # Configuration
@@ -208,6 +209,50 @@ class ListeBatchRequest(BaseModel):
     listes: List[ListeRequest] = Field(..., min_length=1)
 
 
+class SchemaExport(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, allow_inf_nan=False)
+
+
+NiveauExport = Literal["DT3", "DTS", "L3", "M1", "M2"]
+
+
+class EtudiantExportListe(SchemaExport):
+    bassin_id: str = Field(..., min_length=1, max_length=100)
+    bassin: str = Field(..., min_length=1, max_length=200)
+    niveau: NiveauExport
+    matricule: str = Field(..., min_length=1, max_length=100)
+    nom: str = Field(..., min_length=1, max_length=200)
+    prenoms: str = Field("", max_length=200)
+    date_naissance: str = Field("", max_length=100)
+    lieu_naissance: str = Field("", max_length=500)
+    note_ecrit: Optional[float] = Field(None, ge=0, le=20)
+    note_soutenance: Optional[float] = Field(None, ge=0, le=20)
+    mention: str = Field("", max_length=100)
+    annee: str = Field("", max_length=100)
+
+
+class ExportListeRequest(SchemaExport):
+    etudiants: List[EtudiantExportListe] = Field(..., min_length=1, max_length=10000)
+    niveaux: List[NiveauExport] = Field(..., min_length=1, max_length=5)
+    colonnes: List[str] = Field(..., min_length=1, max_length=9)
+    critere: Literal["tous", "avec_soutenance", "ecrit_sans_soutenance", "ecrit_termine", "admis", "en_cours", "sans_notes"] = "tous"
+    regroupement: Literal["bassin_niveau", "niveau", "liste_unique"] = "bassin_niveau"
+    session: str = Field("", max_length=80)
+
+    @model_validator(mode="after")
+    def _selection_coherente(self):
+        if len(set(self.niveaux)) != len(self.niveaux):
+            raise ValueError("Un niveau ne doit etre selectionne qu'une seule fois")
+        if len(set(self.colonnes)) != len(self.colonnes) or any(c not in liste_export.COLONNES for c in self.colonnes):
+            raise ValueError("Colonnes invalides ou dupliquees")
+        if any(e.niveau not in self.niveaux for e in self.etudiants):
+            raise ValueError("Un etudiant appartient a un niveau non selectionne")
+        identites = [(e.matricule, e.annee) for e in self.etudiants]
+        if len(set(identites)) != len(identites):
+            raise ValueError("Un etudiant figure plusieurs fois dans la selection")
+        return self
+
+
 # --------------------------------------------------------------------------
 # Application
 # --------------------------------------------------------------------------
@@ -371,6 +416,21 @@ def generate_liste(req: ListeRequest):
 @app.post("/generate-listes-batch")
 def generate_listes_batch(req: ListeBatchRequest):
     return _batch_response("liste", req.listes, "listes.zip")
+
+
+@app.post("/export-liste-etudiants")
+def export_liste_etudiants(req: ExportListeRequest):
+    """Liste Word complete avec colonnes choisies et regroupement des bassins/niveaux."""
+    code = "_".join(n for n in liste_export.NIVEAUX if n in req.niveaux)
+    session = docgen.slugify(req.session) if req.session else "sans_session"
+    donnees = liste_export.generer_export(req.model_dump())
+    # Le DOCX est deja en memoire ; l'envoyer d'un bloc evite de decouper un
+    # fichier ZIP binaire en centaines de fragments selon ses octets de ligne.
+    return Response(donnees, media_type=DOCX_MIME, headers={
+        "Content-Disposition": f'attachment; filename="liste_etudiants_{code}_{session}.docx"',
+        "Access-Control-Expose-Headers": "Content-Disposition",
+        "Cache-Control": "no-store",
+    })
 
 
 @app.exception_handler(Exception)

@@ -1,0 +1,116 @@
+[
+  {
+    "niveau": "DT3",
+    "source": "Liste_Des_Admis_DT3_2025-2026.docx",
+    "source_sha256": "9cf720cf6cb9727f8cb6429f1a423d0b29163d57036947df3a4d802c9d37e7bc",
+    "modele": "Export_DT3.docx",
+    "modele_sha256": "a9c29dcc08f27facd4c3cea2ef3d77b522f75e91577c6b87c5441244e6b7b133",
+    "parties_preservees": {
+      "_rels/.rels": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df",
+      "word/footnotes.xml": "71544f40c488ba5d64f4a306efb74faf585e0e4dc4046bef0c2237d8c60c8f5f",
+      "word/endnotes.xml": "73031a932fabeeb65b0b1f62bae5aca0a5cb15f6be9fdee4c0659640ca0c8d08",
+      "word/footer1.xml": "d66c9dc43904de62a5e691f6c85abf47937ca25677be91103e483509fbce265e",
+      "word/media/image1.jpeg": "d62fe76ab4bea24f085854c5aea27afa0d5262d9599c8956e4a6214af3facb1a",
+      "word/theme/theme1.xml": "1e8bd45fb041c3675c8f23e7d18250eb2124cf717b9a09d51560606cdb2b3db3",
+      "word/styles.xml": "a04892708d86ff7b855e4dd216d3aa915b073ba8555fce4193c49999a09d7143",
+      "word/webSettings.xml": "7b37f953ca02834af2974e347317f034c644d3cffb17de12553c4ca662da90bc",
+      "word/fontTable.xml": "986097392dbf7b757f965f3b6f1bcc422da3f11d7de2726d3d7b76af0046362c"
+    }
+  },
+  {
+    "niveau": "DTS",
+    "source": "Liste_Des_Admis_DTS_2025-2026.docx",
+    "source_sha256": "721c51df57a33ef7e7dee26dbb4038abd7a42931cdd646051b74b4a96ffd2652",
+    "modele": "Export_DTS.docx",
+    "modele_sha256": "ab4a9ec2f059a635444ca089587689bd4eea151511a16980df1f7b8d5ca725ed",
+    "parties_preservees": {
+      "_rels/.rels": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df",
+      "word/footnotes.xml": "b589f639ef1997cb429c2042b091b3f3c518ebc873474d5f7e73834f238a31b7",
+      "word/endnotes.xml": "0b140ace572734906f40de8013a93521d98a61c515a73e34b8a8bd44dcb0db02",
+      "word/footer1.xml": "b3c510c84c60f65f5a9eb19e56b3600137ed30300bb5e480303081650eb1a3a1",
+      "word/media/image1.jpeg": "d62fe76ab4bea24f085854c5aea27afa0d5262d9599c8956e4a6214af3facb1a",
+      "word/theme/theme1.xml": "1e8bd45fb041c3675c8f23e7d18250eb2124cf717b9a09d51560606cdb2b3db3",
+      "word/styles.xml": "a04892708d86ff7b855e4dd216d3aa915b073ba8555fce4193c49999a09d7143",
+      "word/webSettings.xml": "b4898b9c73489cde1f3567ecbfd9f6793fa5652daaf7c570f7d8305de7d65022",
+      "word/fontTable.xml": "83927e19f5c648788c5f1738217d4715588226c75a87bb9604f99db0a5bcbdbf"
+    }
+  },
+  {
+    "niveau": "L3",
+    "source": "Liste_Des_Admis_L3_2025-2026.docx",
+    "source_sha256": "2a07944990f24edd070a57a314c389d86e09d8d86b7cc864155c635f308dc4f1",
+    "modele": "Export_L3.docx",
+    "modele_sha256": "c1794c6eabefc31258e024835df6dba292d1871f7b7c9be09f03f559bcb970f4",
+    "parties_preservees": {
+      "_rels/.rels": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df",
+      "word/footnotes.xml": "ca9f473c80cc8ee58775bd2fd648177adc8bc71cc6406cd15d218997044832b5",
+      "word/endnotes.xml": "cd2965c0f20f0a8376175f60e8c7f841f1c76ba706c53b2adc8c42c629f1bac3",
+      "word/footer1.xml": "e10e37459fefdad7387df42757dc0710db9eac538cbe44f3b415a5f5f6d3bb27",
+      "word/media/image1.jpeg": "d62fe76ab4bea24f085854c5aea27afa0d5262d9599c8956e4a6214af3facb1a",
+      "word/theme/theme1.xml": "1e8bd45fb041c3675c8f23e7d18250eb2124cf717b9a09d51560606cdb2b3db3",
+      "word/styles.xml": "3c2de6c58d1c8f8699d813101afef9ec9dcdcc9a16f480b9b75c530236faeffe",
+      "word/webSettings.xml": "7b37f953ca02834af2974e347317f034c644d3cffb17de12553c4ca662da90bc",
+      "word/fontTable.xml": "83927e19f5c648788c5f1738217d4715588226c75a87bb9604f99db0a5bcbdbf"
+    }
+  },
+  {
+    "niveau": "M1",
+    "source": "Liste_Des_Admis_M1_2025-2026.docx",
+    "source_sha256": "a9cd8a211fe41fcc0309aa15627bd6d1d3e6d7956a5654eccf0e1f0c3abfa089",
+    "modele": "Export_M1.docx",
+    "modele_sha256": "6eac4501e4b49a932f87010c46cce955940f7ccbf7028ae5e87e2d1d85e36a19",
+    "parties_preservees": {
+      "_rels/.rels": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df",
+      "word/footnotes.xml": "62b63078d0a41abe1efac62423c3298fb2f240d201265af6d3db6c8dceb16d42",
+      "word/endnotes.xml": "d7591b2f43fdc1c3a8312d815ae21f6f956754ed0b9a340323affcb75b25d3ed",
+      "word/footer1.xml": "d2d266222161ca123f77cd28c5a7af1e7e84829703b4a88e0ab9011bc94cf18b",
+      "word/media/image1.jpeg": "d62fe76ab4bea24f085854c5aea27afa0d5262d9599c8956e4a6214af3facb1a",
+      "word/theme/theme1.xml": "1e8bd45fb041c3675c8f23e7d18250eb2124cf717b9a09d51560606cdb2b3db3",
+      "word/styles.xml": "3c2de6c58d1c8f8699d813101afef9ec9dcdcc9a16f480b9b75c530236faeffe",
+      "word/webSettings.xml": "7b37f953ca02834af2974e347317f034c644d3cffb17de12553c4ca662da90bc",
+      "word/fontTable.xml": "83927e19f5c648788c5f1738217d4715588226c75a87bb9604f99db0a5bcbdbf"
+    }
+  },
+  {
+    "niveau": "M2",
+    "source": "Liste_Des_Admis_M2_2025-2026.docx",
+    "source_sha256": "f0cf2240ce44777c36dc1d4d152711ad5616e6775c9e635ef77ab375dec9cf5a",
+    "modele": "Export_M2.docx",
+    "modele_sha256": "e9bbc276d26f518e8c5b38ae6c4d1caa3aa7d953bd950f1931d87d22be5b1fa1",
+    "parties_preservees": {
+      "_rels/.rels": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df",
+      "word/footnotes.xml": "09fd6d29f5404dd6c522ac62dae833f2a21f9b3288ffad33a69c850c2d794a9c",
+      "word/endnotes.xml": "1948fe55e35705478640efea74c7ff468f8776516aa1ced70320cb4e2a4aecbe",
+      "word/footer1.xml": "1270c81b962dae4de762dadc55cc7be7cf3e8badee913c3d5db53a0d8d7e8083",
+      "word/media/image1.png": "45ad755b575dfd042054f7a1aa3fdbc91be5a74897d9765809de246cb4e4fb40",
+      "word/media/image2.jpeg": "d62fe76ab4bea24f085854c5aea27afa0d5262d9599c8956e4a6214af3facb1a",
+      "word/theme/theme1.xml": "1e8bd45fb041c3675c8f23e7d18250eb2124cf717b9a09d51560606cdb2b3db3",
+      "word/styles.xml": "3c2de6c58d1c8f8699d813101afef9ec9dcdcc9a16f480b9b75c530236faeffe",
+      "word/webSettings.xml": "8f445a28d510d0255a862ad998e536d46cb03be4ad063648dea79628d417e513",
+      "word/fontTable.xml": "986097392dbf7b757f965f3b6f1bcc422da3f11d7de2726d3d7b76af0046362c"
+    }
+  },
+  {
+    "niveau": "MIXTE",
+    "source": "LISTE_ADMIS_AMBANJA.docx",
+    "source_sha256": "daaa648be551d30e63fa10a4c1797acffa6f8270d1fbdbe3891c3990b70d8bc6",
+    "modele": "Export_MIXTE.docx",
+    "modele_sha256": "7e58c9164d6338e1d98fb957e840ff2f1235027eb10e8f91c662292a4257ad95",
+    "parties_preservees": {
+      "_rels/.rels": "314fc64197cbf95af394999eec4d6fe9de240210596e70826a08e63e57ad5934",
+      "word/styles.xml": "139df0de536727cb766db916568b65c82f93d6c29b0ebfec45f9b1b38bbe0b63",
+      "word/numbering.xml": "548f398038820c1597be100faa05c9be7afcf849f3ad6076f2728c68933d943b",
+      "word/footnotes.xml": "774ce254f01cde1079d43e81a0db30ac82b3b2bae875b07c4fe28403ba30b6a9",
+      "word/endnotes.xml": "52f6c33e62c233e0d9f9c41ec259ffd943ea9cdc413293d43e6ffb213682a5cf",
+      "word/media/30b23f8ab79b453499db53c7b4b96e93926ef9df.png": "66eb356811dfe096d72224b2772a37aad885b6c04bacece8bd7608c647a35639",
+      "word/fontTable.xml": "a746dbb577ec5d68983d659707c0750ca89d40b9d3316e31af331d5e1c736bad",
+      "word/header1.xml": "e1d2d4060c859ac7d6648284ba49706cf80e2e14374d3cf9bb2983edf9ee677f",
+      "word/footer1.xml": "cc831c46cac03c968fc5b2d8e0ce3179d17a559dd54fa4e4fba3f7c2680cc344",
+      "word/header2.xml": "e1d2d4060c859ac7d6648284ba49706cf80e2e14374d3cf9bb2983edf9ee677f",
+      "word/footer2.xml": "cc831c46cac03c968fc5b2d8e0ce3179d17a559dd54fa4e4fba3f7c2680cc344",
+      "word/header3.xml": "e1d2d4060c859ac7d6648284ba49706cf80e2e14374d3cf9bb2983edf9ee677f",
+      "word/footer3.xml": "cc831c46cac03c968fc5b2d8e0ce3179d17a559dd54fa4e4fba3f7c2680cc344",
+      "docProps/custom.xml": "8ec73cc7ce297e42cc652a1d1884d4ffb18ffa0ba7a6502a36f8da90d1be61a1"
+    }
+  }
+]
