@@ -298,3 +298,17 @@ décompressé) inutile pour la génération. Il est retiré en mémoire au charg
 4,7 Mo à ~1,6 Mo de téléchargement. Les lots (`*-batch`) sont assemblés sans recompression.
 Sur l'offre gratuite de Render, le service s'endort après ~15 min d'inactivité : la première
 requête qui suit peut prendre 30 à 60 s (démarrage à froid), indépendamment du code.
+
+## Source des notes Excel par bassin
+
+`POST /export-source-notes` reçoit le bassin et ses niveaux, avec les matières,
+coefficients, étudiants et notes alignées dans le même ordre. Il retourne un
+unique `.xlsx` avec les feuilles DT3, DTS, L3, M1 et M2 et, si nécessaire, les
+niveaux supplémentaires configurés. Les matières viennent de la plateforme.
+
+Le générateur utilise uniquement la bibliothèque standard Python et les en-têtes,
+styles et logos extraits du modèle utilisateur dans `templates/source_notes`.
+Aucune ancienne ligne d’étudiant du modèle n’est conservée. Les cellules de notes
+sont numériques, les absences restent vides et les dates exactes sont des dates
+Excel. Les formules de pondération, total, moyenne et mention sont recalculables.
+Les résultats partiels ne sont pas présentés comme une moyenne écrite définitive.

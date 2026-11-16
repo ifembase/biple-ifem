@@ -1,0 +1,755 @@
+{
+  "styles": {
+    "texte": 128,
+    "centre": 129,
+    "nombre": 130,
+    "date": 131
+  },
+  "niveaux": {
+    "DT3": {
+      "entete": 14,
+      "lignes": [
+        {
+          "numero": 1,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 2,
+          "hauteur": 15.0,
+          "cellules": [
+            {
+              "col": 1,
+              "valeur": "MINISTÈRE DE L'ENSEIGNEMENT TECHNIQUE ET DE \nLA FORMATION PROFESSIONNELLE\n********************\nSECRÉTARIAT GÉNÉRAL\n********************\nDIRECTION RÉGIONALE DE L'ENSEIGNEMENT \nTECHNIQUE ET DE LA FORMATION PROFESSIONNELLE\nANALAMANGA\n********************\nSERVICE DE L’ÉVALUATION DES ACQUIS\n********************",
+              "style": 113
+            }
+          ]
+        },
+        {
+          "numero": 3,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 4,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 5,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 6,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 7,
+          "hauteur": 15.75,
+          "cellules": []
+        },
+        {
+          "numero": 8,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Source des notes",
+              "style": 115
+            }
+          ]
+        },
+        {
+          "numero": 9,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Année universitaire : {{ANNEES}}",
+              "style": 116
+            }
+          ]
+        },
+        {
+          "numero": 10,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Bassin : {{BASSIN}}",
+              "style": 115
+            }
+          ]
+        },
+        {
+          "numero": 11,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 12,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 13,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 1,
+              "valeur": "Niveau : Diplôme de Technicien en Sciences de l'Éducation (DT - SE)",
+              "style": 115
+            }
+          ]
+        }
+      ],
+      "fusions": [
+        "A13:C13",
+        "D9:F9",
+        "D8:F8",
+        "A2:C12",
+        "D10:F10"
+      ],
+      "styles_entete": [
+        6,
+        6,
+        6,
+        31,
+        39,
+        2,
+        3,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        3,
+        4,
+        4,
+        27,
+        27,
+        28
+      ],
+      "largeurs": [
+        8.0,
+        11.42578125,
+        52.140625,
+        12.5703125,
+        31.7109375,
+        18.140625,
+        11.42578125,
+        10.85546875,
+        13.5703125,
+        10.85546875,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        6.7109375,
+        10.85546875,
+        13.0,
+        11.42578125,
+        15.42578125,
+        13.0,
+        11.42578125,
+        13.0,
+        13.0
+      ],
+      "dessin": 1
+    },
+    "DTS": {
+      "entete": 14,
+      "lignes": [
+        {
+          "numero": 1,
+          "hauteur": 15.0,
+          "cellules": [
+            {
+              "col": 1,
+              "valeur": "MINISTÈRE DE L'ENSEIGNEMENT TECHNIQUE ET DE \nLA FORMATION PROFESSIONNELLE\n********************\nSECRÉTARIAT GÉNÉRAL\n********************\nDIRECTION RÉGIONALE DE L'ENSEIGNEMENT \nTECHNIQUE ET DE LA FORMATION PROFESSIONNELLE\nANALAMANGA\n********************\nSERVICE DE L’ÉVALUATION DES ACQUIS\n********************",
+              "style": 113
+            }
+          ]
+        },
+        {
+          "numero": 2,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 3,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 4,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 5,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 6,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 7,
+          "hauteur": 15.75,
+          "cellules": []
+        },
+        {
+          "numero": 8,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Source des notes",
+              "style": 115
+            }
+          ]
+        },
+        {
+          "numero": 9,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Année universitaire : {{ANNEES}}",
+              "style": 116
+            }
+          ]
+        },
+        {
+          "numero": 10,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Bassin : {{BASSIN}}",
+              "style": 115
+            }
+          ]
+        },
+        {
+          "numero": 11,
+          "hauteur": 15.75,
+          "cellules": []
+        },
+        {
+          "numero": 12,
+          "hauteur": 15.75,
+          "cellules": []
+        },
+        {
+          "numero": 13,
+          "hauteur": 15.0,
+          "cellules": [
+            {
+              "col": 1,
+              "valeur": "Niveau : Diplôme de Technicien Supérieur en Sciences de l'Éducation (DTS - SE)",
+              "style": 115
+            }
+          ]
+        }
+      ],
+      "fusions": [
+        "A13:C13",
+        "A1:C12",
+        "D9:F9",
+        "D8:F8",
+        "D10:F10"
+      ],
+      "styles_entete": [
+        6,
+        6,
+        6,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        7,
+        3,
+        4,
+        4,
+        27,
+        27,
+        28
+      ],
+      "largeurs": [
+        7.7109375,
+        11.42578125,
+        64.0,
+        11.28515625,
+        31.7109375,
+        13.5703125,
+        11.7109375,
+        13.28515625,
+        11.7109375,
+        19.28515625,
+        11.7109375,
+        18.5703125,
+        11.7109375,
+        13.0,
+        13.0,
+        23.140625,
+        9.28515625,
+        14.0,
+        12.7109375,
+        17.28515625,
+        11.85546875,
+        13.0,
+        14.7109375
+      ],
+      "dessin": 2
+    },
+    "L3": {
+      "entete": 11,
+      "lignes": [
+        {
+          "numero": 1,
+          "hauteur": 15,
+          "cellules": [
+            {
+              "col": 1,
+              "valeur": "MINISTÈRE DE L’ENSEIGNEMENT SUPÉRIEUR ET DE LA\n RECHERCHE SCIENTIFIQUE\n********************\nSECRÉTARIAT GÉNÉRAL\n********************\nDIRECTION GÉNÉRALE DE L’ENSEIGNEMENT SUPÉRIEUR\n********************\n",
+              "style": 113
+            }
+          ]
+        },
+        {
+          "numero": 2,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 3,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 4,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 5,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 6,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 7,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Source des notes",
+              "style": 115
+            }
+          ]
+        },
+        {
+          "numero": 8,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Année universitaire : {{ANNEES}}",
+              "style": 116
+            }
+          ]
+        },
+        {
+          "numero": 9,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Bassin : {{BASSIN}}",
+              "style": 115
+            }
+          ]
+        },
+        {
+          "numero": 10,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 1,
+              "valeur": "Niveau : LICENCE en Sciences de l'Education (L3)",
+              "style": 117
+            }
+          ]
+        }
+      ],
+      "fusions": [
+        "A1:C9",
+        "A10:C10",
+        "D9:F9",
+        "D7:F7",
+        "D8:F8"
+      ],
+      "styles_entete": [
+        6,
+        6,
+        6,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        8,
+        8,
+        5,
+        3,
+        4,
+        4,
+        27,
+        27,
+        28
+      ],
+      "largeurs": [
+        7.7109375,
+        11.42578125,
+        58.7109375,
+        17.140625,
+        28.140625,
+        10.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        11.85546875,
+        10.0,
+        15.28515625,
+        8.140625,
+        18.28515625,
+        10.7109375,
+        13.0,
+        15.28515625,
+        13.0,
+        11.85546875,
+        13.0,
+        13.0
+      ],
+      "dessin": 3
+    },
+    "M1": {
+      "entete": 11,
+      "lignes": [
+        {
+          "numero": 1,
+          "hauteur": 15,
+          "cellules": [
+            {
+              "col": 1,
+              "valeur": "MINISTÈRE DE L’ENSEIGNEMENT SUPÉRIEUR ET DE LA\n RECHERCHE SCIENTIFIQUE\n********************\nSECRÉTARIAT GÉNÉRAL\n********************\nDIRECTION GÉNÉRALE DE L’ENSEIGNEMENT SUPÉRIEUR\n********************\n",
+              "style": 113
+            }
+          ]
+        },
+        {
+          "numero": 2,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 3,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 4,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 5,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 6,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 7,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Source des notes",
+              "style": 115
+            }
+          ]
+        },
+        {
+          "numero": 8,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Année universitaire : {{ANNEES}}",
+              "style": 116
+            }
+          ]
+        },
+        {
+          "numero": 9,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Bassin : {{BASSIN}}",
+              "style": 115
+            }
+          ]
+        },
+        {
+          "numero": 10,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 1,
+              "valeur": "Niveau : MASTER I en Sciences de l'Education (M1)",
+              "style": 117
+            }
+          ]
+        }
+      ],
+      "fusions": [
+        "A1:C9",
+        "A10:C10",
+        "D9:F9",
+        "D7:F7",
+        "D8:F8"
+      ],
+      "styles_entete": [
+        6,
+        6,
+        6,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        11,
+        3,
+        4,
+        4,
+        27,
+        27,
+        28
+      ],
+      "largeurs": [
+        5.7109375,
+        15.0,
+        46.0,
+        11.28515625,
+        36.5703125,
+        10.5703125,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        10.28515625,
+        13.0,
+        13.140625,
+        17.42578125,
+        13.0,
+        13.0,
+        13.0
+      ],
+      "dessin": 4
+    },
+    "M2": {
+      "entete": 11,
+      "lignes": [
+        {
+          "numero": 1,
+          "hauteur": 15,
+          "cellules": [
+            {
+              "col": 1,
+              "valeur": "MINISTÈRE DE L’ENSEIGNEMENT SUPÉRIEUR ET DE LA\n RECHERCHE SCIENTIFIQUE\n********************\nSECRÉTARIAT GÉNÉRAL\n********************\nDIRECTION GÉNÉRALE DE L’ENSEIGNEMENT SUPÉRIEUR\n********************\n",
+              "style": 113
+            }
+          ]
+        },
+        {
+          "numero": 2,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 3,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 4,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 5,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 6,
+          "hauteur": 15,
+          "cellules": []
+        },
+        {
+          "numero": 7,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Source des notes",
+              "style": 115
+            }
+          ]
+        },
+        {
+          "numero": 8,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Année universitaire : {{ANNEES}}",
+              "style": 116
+            }
+          ]
+        },
+        {
+          "numero": 9,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 4,
+              "valeur": "Bassin : {{BASSIN}}",
+              "style": 115
+            }
+          ]
+        },
+        {
+          "numero": 10,
+          "hauteur": 15.75,
+          "cellules": [
+            {
+              "col": 1,
+              "valeur": "Niveau : MASTER II en Sciences de l'Education (M2)",
+              "style": 117
+            }
+          ]
+        }
+      ],
+      "fusions": [
+        "A10:C10",
+        "A1:C9",
+        "D9:F9",
+        "D7:F7",
+        "D8:F8"
+      ],
+      "styles_entete": [
+        6,
+        6,
+        6,
+        14,
+        14,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        24,
+        3,
+        4,
+        4,
+        27,
+        27,
+        28
+      ],
+      "largeurs": [
+        6.5703125,
+        11.42578125,
+        50.0,
+        10.7109375,
+        32.28515625,
+        10.85546875,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        13.0,
+        10.42578125,
+        13.0,
+        13.7109375,
+        13.0,
+        13.0,
+        13.0,
+        13.0
+      ],
+      "dessin": 5
+    }
+  }
+}

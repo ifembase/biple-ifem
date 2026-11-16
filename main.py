@@ -30,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 import docgen
 import liste_export
+import source_notes
 
 # --------------------------------------------------------------------------
 # Configuration
@@ -436,6 +437,20 @@ def export_liste_etudiants(req: ExportListeRequest):
     # fichier ZIP binaire en centaines de fragments selon ses octets de ligne.
     return Response(donnees, media_type=DOCX_MIME, headers={
         "Content-Disposition": f'attachment; filename="{prefixe}_{code}_{session}.docx"',
+        "Access-Control-Expose-Headers": "Content-Disposition",
+        "Cache-Control": "no-store",
+    })
+
+
+@app.post("/export-source-notes")
+def export_source_notes(req: source_notes.SourceNotesRequest):
+    """Source Excel complete d'un bassin, avec feuilles et formules par niveau."""
+    annees = sorted({e.annee for niveau in req.niveaux for e in niveau.etudiants if e.annee})
+    periode = docgen.slugify(annees[0]) if len(annees) == 1 else "TOUTES_ANNEES"
+    filename = f"SOURCE_NOTES_{docgen.slugify(req.bassin).upper()[:80]}_{periode}.xlsx"
+    contenu = source_notes.generer_source_notes(req.model_dump())
+    return Response(contenu, media_type=source_notes.XLSX_MIME, headers={
+        "Content-Disposition": f'attachment; filename="{filename}"',
         "Access-Control-Expose-Headers": "Content-Disposition",
         "Cache-Control": "no-store",
     })
