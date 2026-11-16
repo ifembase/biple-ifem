@@ -29,9 +29,21 @@ class Schema(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, allow_inf_nan=False)
 
 
+def _nombre_decimal(valeur):
+    if isinstance(valeur, str):
+        valeur = valeur.strip().replace('\u00a0', '').replace('\u202f', '').replace(',', '.')
+        return valeur if valeur else None
+    return valeur
+
+
 class MatiereSource(Schema):
     nom: str = Field(..., min_length=1, max_length=300)
     coefficient: float = Field(..., gt=0, le=1000)
+
+    @field_validator("coefficient", mode="before")
+    @classmethod
+    def coefficient_decimal(cls, valeur):
+        return _nombre_decimal(valeur)
 
 
 class EtudiantSource(Schema):
@@ -42,14 +54,19 @@ class EtudiantSource(Schema):
     lieu_naissance: str = Field("", max_length=500)
     annee: str = Field("", max_length=100)
     notes: list[float | None] = Field(..., max_length=100)
-    note_soutenance: float | None = Field(None, ge=0, le=20)
+    # Un export doit conserver les anciennes valeurs, meme hors plage, sans
+    # les transformer en notes /20. Elles seront signalees dans le classeur.
+    note_soutenance: float | None = None
 
-    @field_validator("notes")
+    @field_validator("notes", mode="before")
     @classmethod
-    def notes_valides(cls, valeurs):
-        if any(note is not None and not 0 <= note <= 20 for note in valeurs):
-            raise ValueError("Chaque note doit etre comprise entre 0 et 20")
-        return valeurs
+    def notes_decimales(cls, valeurs):
+        return [_nombre_decimal(v) for v in valeurs] if isinstance(valeurs, (list, tuple)) else valeurs
+
+    @field_validator("note_soutenance", mode="before")
+    @classmethod
+    def soutenance_decimale(cls, valeur):
+        return _nombre_decimal(valeur)
 
 
 class NiveauSource(Schema):
@@ -79,6 +96,26 @@ class SourceNotesRequest(Schema):
 @lru_cache(maxsize=1)
 def _modele():
     return json.loads((DOSSIER / "modele.json").read_text(encoding="utf8"))
+
+
+@lru_cache(maxsize=1)
+def _styles_avec_alerte():
+    xml = (DOSSIER / 'styles.xml').read_text(encoding='utf8')
+    dxf = '<dxf><font><b/><color rgb="FF9C0006"/></font><fill><patternFill patternType="solid"><fgColor rgb="FFFFC7CE"/><bgColor indexed="64"/></patternFill></fill></dxf>'
+    motif = re.search(r'<dxfs\b([^>]*?)(?:\s*/>|>(.*?)</dxfs>)', xml, re.DOTALL)
+    if motif:
+        compte = re.search(r'count="(\d+)"', motif.group(1))
+        index = int(compte.group(1)) if compte else 0
+        bloc = f'<dxfs count="{index+1}">{motif.group(2) or ""}{dxf}</dxfs>'
+        xml = xml[:motif.start()] + bloc + xml[motif.end():]
+    else:
+        index = 0
+        xml = xml.replace('<tableStyles', f'<dxfs count="1">{dxf}</dxfs><tableStyles', 1)
+    return xml.encode('utf8'), index
+
+
+def _hors_plage(note):
+    return note is not None and not 0 <= note <= 20
 
 
 def _texte(value):
@@ -149,36 +186,41 @@ def _ligne(etudiant, matieres, numero, rang, styles):
         brutes.append(brute)
         ponderees.append(ponderee)
         coefficients.append(coeff)
-        valeur = Decimal(str(note)) * Decimal(str(matiere['coefficient'])) if note is not None else None
+        valeur = Decimal(str(note)) * Decimal(str(matiere['coefficient'])) if note is not None and not _hors_plage(note) else None
         if valeur is not None:
             total += valeur
             saisies += 1
         cellules.extend([_cell(brute, note, styles['nombre']),
-                         _cell(ponderee, valeur, styles['nombre'], f'IF({brute}="","",{brute}*{coeff})')])
+                         _cell(ponderee, valeur, styles['nombre'], f'IF(OR({brute}="",{brute}<0,{brute}>20),"",{brute}*{coeff})')])
     debut = 6 + len(matieres) * 2
     r, s, t, u, v, w = [f'{_col(debut+i)}{numero}' for i in range(6)]
     complet = bool(matieres) and saisies == len(matieres)
     somme_coeff = sum(Decimal(str(m['coefficient'])) for m in matieres)
     moyenne = (total / somme_coeff).quantize(Decimal('.01'), rounding=ROUND_HALF_UP) if complet else None
     soutenance = etudiant['note_soutenance']
-    generale = ((moyenne + Decimal(str(soutenance))) / 2).quantize(Decimal('.01'), rounding=ROUND_HALF_UP) if moyenne is not None and soutenance is not None else moyenne
+    ecrit_invalide = any(_hors_plage(note) for note in etudiant['notes'])
+    soutenance_invalide = _hors_plage(soutenance)
+    generale = None if soutenance_invalide else ((moyenne + Decimal(str(soutenance))) / 2).quantize(Decimal('.01'), rounding=ROUND_HALF_UP) if moyenne is not None and soutenance is not None else moyenne
     if matieres:
         compte = 'COUNT(' + ','.join(brutes) + ')'
-        formules = [f'IF({compte}=0,"",SUM({",".join(ponderees)}))',
-                    f'IF({compte}={len(matieres)},ROUND({r}/SUM({",".join(coefficients)}),2),"")',
-                    f'IF({s}="","",IF({s}>=10,"Admis(e)","Non-admis(e)"))', None,
-                    f'IF({s}="","",IF({u}="",{s},ROUND(({s}+{u})/2,2)))',
-                    f'IF({s}="",IF({compte}=0,"En attente","Évaluation en cours"),IF({v}<8,"Ajourné",IF({v}<10,"Rattrapage",IF({v}<12,"Passable",IF({v}<14,"Assez-Bien",IF({v}<16,"Bien",IF({v}<18,"Très-Bien","Honorable")))))))']
+        hors_plage = 'OR(' + ','.join(f'{cellule}<0,{cellule}>20' for cellule in brutes) + ')'
+        mention_valide = f'IF({v}<8,"Ajourné",IF({v}<10,"Rattrapage",IF({v}<12,"Passable",IF({v}<14,"Assez-Bien",IF({v}<16,"Bien",IF({v}<18,"Très-Bien","Honorable"))))))'
+        formules = [f'IF(COUNT({",".join(ponderees)})=0,"",SUM({",".join(ponderees)}))',
+                    f'IF(AND({compte}={len(matieres)},NOT({hors_plage})),ROUND({r}/SUM({",".join(coefficients)}),2),"")',
+                    f'IF({hors_plage},"Note hors plage à vérifier",IF({s}="","",IF({s}>=10,"Admis(e)","Non-admis(e)")))', None,
+                    f'IF(OR({s}="",{u}<0,{u}>20),"",IF({u}="",{s},ROUND(({s}+{u})/2,2)))',
+                    f'IF({hors_plage},"Note hors plage à vérifier",IF(OR({u}<0,{u}>20),"Soutenance à vérifier",IF({s}="",IF({compte}=0,"En attente","Évaluation en cours"),{mention_valide})))']
     else:
         formules = [None] * 6
-    valeurs = [total if saisies else None, moyenne, None if moyenne is None else 'Admis(e)' if moyenne >= 10 else 'Non-admis(e)',
-               soutenance, generale, _mention(generale, saisies)]
+    examen = 'Note hors plage à vérifier' if ecrit_invalide else None if moyenne is None else 'Admis(e)' if moyenne >= 10 else 'Non-admis(e)'
+    mention = 'Note hors plage à vérifier' if ecrit_invalide else 'Soutenance à vérifier' if soutenance_invalide else _mention(generale, saisies)
+    valeurs = [total if saisies else None, moyenne, examen, soutenance, generale, mention]
     for index, (adresse, valeur, formule) in enumerate(zip((r, s, t, u, v, w), valeurs, formules)):
         cellules.append(_cell(adresse, valeur, styles['texte'] if index in (2, 5) else styles['nombre'], formule))
     return f'<row r="{numero}" ht="30" customHeight="1">' + ''.join(cellules) + '</row>'
 
 
-def _feuille(niveau, bassin, annees, modele):
+def _feuille(niveau, bassin, annees, modele, dxf_alerte):
     h = modele['entete']
     matieres = niveau['matieres']
     etudiants = sorted(niveau['etudiants'], key=lambda e: (e['nom'].casefold(), e['prenoms'].casefold(), e['matricule']))
@@ -218,7 +260,13 @@ def _feuille(niveau, bassin, annees, modele):
     xml += f'<dimension ref="A1:{_col(dernier)}{fin}"/><sheetViews><sheetView workbookViewId="0" showGridLines="0"><pane xSplit="5" ySplit="{h}" topLeftCell="F{h+1}" activePane="bottomRight" state="frozen"/><selection pane="bottomRight" activeCell="F{h+1}" sqref="F{h+1}"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>'
     xml += '<cols>' + ''.join(f'<col min="{i}" max="{i}" width="{largeur}" customWidth="1"/>' for i, largeur in enumerate(largeurs, 1)) + '</cols>'
     xml += '<sheetData>' + ''.join(rows) + '</sheetData>'
-    xml += f'<autoFilter ref="A{h}:{_col(dernier)}{fin}"/><mergeCells count="{len(modele["fusions"])}">{fusions}</mergeCells>' + validation
+    xml += f'<autoFilter ref="A{h}:{_col(dernier)}{fin}"/><mergeCells count="{len(modele["fusions"])}">{fusions}</mergeCells>'
+    if etudiants:
+        xml += (f'<conditionalFormatting sqref="{plages}">'
+                f'<cfRule type="cellIs" dxfId="{dxf_alerte}" priority="1" operator="lessThan"><formula>0</formula></cfRule>'
+                f'<cfRule type="cellIs" dxfId="{dxf_alerte}" priority="2" operator="greaterThan"><formula>20</formula></cfRule>'
+                '</conditionalFormatting>')
+    xml += validation
     xml += '<printOptions horizontalCentered="1"/><pageMargins left="0.25" right="0.25" top="0.35" bottom="0.35" header="0.15" footer="0.15"/><pageSetup paperSize="8" orientation="landscape" fitToWidth="1" fitToHeight="0"/><drawing r:id="rId1"/></worksheet>'
     # sheetPr precedes dimension in SpreadsheetML.
     xml = xml.replace('<dimension ', '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ', 1)
@@ -239,8 +287,9 @@ def generer_source_notes(data):
     feuilles, relations, definitions, contenus = [], [], [], []
     noms_utilises = set()
     resultat = io.BytesIO()
+    styles, dxf_alerte = _styles_avec_alerte()
     with zipfile.ZipFile(resultat, 'w', zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr('xl/styles.xml', (DOSSIER / 'styles.xml').read_bytes())
+        archive.writestr('xl/styles.xml', styles)
         archive.writestr('xl/theme/theme1.xml', (DOSSIER / 'theme.xml').read_bytes())
         for i in range(1, 6):
             archive.writestr(f'xl/media/image{i}.png', (DOSSIER / f'image{i}.png').read_bytes())
@@ -260,7 +309,7 @@ def generer_source_notes(data):
             definitions.append(f'<definedName name="_xlnm.Print_Titles" localSheetId="{i-1}">{_texte(titre)}</definedName>')
             contenus.extend([f'<Override PartName="/xl/worksheets/sheet{i}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
                              f'<Override PartName="/xl/drawings/drawing{i}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>'])
-            archive.writestr(f'xl/worksheets/sheet{i}.xml', _feuille(niveau, data['bassin'], annees, modele_feuille))
+            archive.writestr(f'xl/worksheets/sheet{i}.xml', _feuille(niveau, data['bassin'], annees, modele_feuille, dxf_alerte))
             archive.writestr(f'xl/worksheets/_rels/sheet{i}.xml.rels', f'<Relationships xmlns="{P}"><Relationship Id="rId1" Type="{R}/drawing" Target="../drawings/drawing{i}.xml"/></Relationships>')
             dessin = modele_feuille['dessin']
             archive.writestr(f'xl/drawings/drawing{i}.xml', (DOSSIER / f'drawing{dessin}.xml').read_bytes())
