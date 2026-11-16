@@ -128,11 +128,18 @@ class TestListeExport(unittest.TestCase):
         with document(data) as z:
             doc = ET.fromstring(z.read('word/document.xml'))
             tableaux = doc.findall(f'.//{W}tbl')
+            palmares = tableaux[0].findall(W+'tr')[1:]
+            self.assertEqual([''.join(row.findall(W+'tc')[2].itertext()) for row in palmares],
+                             ['TEST-2', 'TEST-9', 'TEST-3', 'TEST-6', 'TEST-7'])
+            self.assertEqual([''.join(row.findall(W+'tc')[1].itertext()) for row in palmares],
+                             ['1', '2', '3', '1', '2'])
             matricules = lambda table: [''.join(row.find(W+'tc').itertext()) for row in table.findall(W+'tr')[1:]]
-            self.assertEqual([matricules(table) for table in tableaux], [
+            self.assertEqual([matricules(table) for table in tableaux[1:]], [
                 ['TEST-2', 'TEST-3', 'TEST-4'], ['TEST-6', 'TEST-7'], ['TEST-9', 'TEST-10', 'TEST-11']])
             self.assertIn('8 étudiant(s)', ''.join(doc.itertext()))
+            self.assertIn('Les 3 meilleurs étudiants par niveau', ''.join(doc.itertext()))
             self.assertIn('Les 3 premiers par niveau et par bassin', ''.join(doc.itertext()))
+            self.assertIsNotNone(doc.find(f'.//{W}pageBreakBefore[@{W}val="1"]'))
 
     def test_top_trois_exige_une_moyenne_generale_et_un_ecrit_complet(self):
         for extra in [dict(moyenne_generale=None), dict(moyenne_generale=15, note_ecrit=None),

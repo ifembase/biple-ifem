@@ -76,19 +76,21 @@ def _valeur(ligne, colonne):
     valeur = ligne.get(colonne)
     if valeur is None or valeur == "":
         return "—"
-    if colonne in ("note_ecrit", "note_soutenance"):
+    if colonne in ("note_ecrit", "note_soutenance", "moyenne_generale"):
         return str(Decimal(str(valeur)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)).replace(".", ",")
     return str(valeur)
 
 
-def _tableau(lignes, colonnes, largeur, mixte):
-    poids = sum(COLONNES[c][1] for c in colonnes)
-    largeurs = [int(largeur * COLONNES[c][1] / poids) for c in colonnes]
+def _tableau(lignes, colonnes, largeur, mixte, *, definitions=None, compact=False):
+    definitions = COLONNES if definitions is None else definitions
+    poids = sum(definitions[c][1] for c in colonnes)
+    largeurs = [int(largeur * definitions[c][1] / poids) for c in colonnes]
     largeurs[-1] += largeur - sum(largeurs)
     couleur = "D9D9D9" if mixte else "000000"
+    marge_verticale = 30 if compact else 65
     bords = ''.join(f'<w:{c} w:val="single" w:sz="6" w:color="{couleur}"/>' for c in ("top", "left", "bottom", "right", "insideH", "insideV"))
     xml = [f'<w:tbl><w:tblPr><w:tblW w:w="{largeur}" w:type="dxa"/><w:tblLayout w:type="fixed"/>'
-           f'<w:tblBorders>{bords}</w:tblBorders><w:tblCellMar><w:top w:w="65" w:type="dxa"/><w:bottom w:w="65" w:type="dxa"/>'
+           f'<w:tblBorders>{bords}</w:tblBorders><w:tblCellMar><w:top w:w="{marge_verticale}" w:type="dxa"/><w:bottom w:w="{marge_verticale}" w:type="dxa"/>'
            '<w:left w:w="70" w:type="dxa"/><w:right w:w="70" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>']
     xml += [f'<w:gridCol w:w="{w}"/>' for w in largeurs]
     xml.append('</w:tblGrid>')
@@ -97,9 +99,9 @@ def _tableau(lignes, colonnes, largeur, mixte):
         xml.append('<w:tr><w:trPr><w:cantSplit/>' + ('<w:tblHeader/>' if entete else '') + '</w:trPr>')
         for colonne, w in zip(colonnes, largeurs):
             fond = "203C73" if mixte and entete else "DCE6F1" if mixte and index % 2 == 0 else "FFFFFF"
-            texte = COLONNES[colonne][0] if entete else _valeur(ligne, colonne)
-            centre = entete or colonne in ("niveau", "date_naissance", "note_ecrit", "note_soutenance")
-            p = _paragraphe(texte, gras=entete, taille=(18 if entete else 19) if len(colonnes) > 6 else 21,
+            texte = definitions[colonne][0] if entete else _valeur(ligne, colonne)
+            centre = entete or colonne in ("niveau", "rang", "date_naissance", "note_ecrit", "note_soutenance", "moyenne_generale")
+            p = _paragraphe(texte, gras=entete, taille=18 if compact else (18 if entete else 19) if len(colonnes) > 6 else 21,
                             centre=centre, suivant=entete, font="Times New Roman" if mixte else "Calibri", cellule=True)
             if mixte and entete:
                 p = p.replace('<w:rPr>', '<w:rPr><w:color w:val="FFFFFF"/>')
@@ -130,6 +132,38 @@ def _groupes(lignes, mode, classement="tous"):
     return list(groupes.values())
 
 
+def _palmares_global(lignes):
+    """Trois meilleurs de chaque niveau, tous bassins selectionnes confondus.
+
+    Les trois premiers locaux suffisent comme candidats : un etudiant exclu
+    du top trois de son bassin ne peut pas entrer dans le top trois global.
+    """
+    effectifs = {}
+    palmares = []
+    for ligne in sorted(lignes, key=lambda l: (
+        NIVEAUX.index(l["niveau"]), -l["moyenne_generale"], _cle(l["nom"]),
+        _cle(l["prenoms"]), l["matricule"], l["bassin_id"],
+    )):
+        niveau = ligne["niveau"]
+        rang = effectifs.get(niveau, 0) + 1
+        if rang > 3:
+            continue
+        effectifs[niveau] = rang
+        palmares.append(dict(ligne, rang=rang, nom_complet=" ".join(
+            valeur for valeur in (ligne["nom"], ligne["prenoms"]) if valeur)))
+    return palmares
+
+
+def _tableau_palmares(lignes, largeur):
+    colonnes = OrderedDict([
+        ("niveau", ("Niveau", .7)), ("rang", ("Rang", .45)),
+        ("matricule", ("Matricule", 1.3)), ("nom_complet", ("Noms et prénoms", 3.5)),
+        ("bassin", ("Bassin", 2.1)), ("moyenne_generale", ("Moyenne générale", 1.2)),
+    ])
+    return _tableau(_palmares_global(lignes), list(colonnes), largeur, True,
+                    definitions=colonnes, compact=True)
+
+
 def generer_export(data):
     """Un unique DOCX, avec autant de tableaux et de pages que necessaire."""
     code = data["niveaux"][0] if len(data["niveaux"]) == 1 else "MIXTE"
@@ -145,15 +179,23 @@ def generer_export(data):
     if code != "MIXTE":
         contenu.append(_paragraphe(titre, gras=True, taille=24, centre=True, suivant=True))
     contenu.append(_paragraphe(f'Sélection : {CRITERES[data["critere"]]} · {len(lignes)} étudiant(s)', centre=True, suivant=True))
-    if classement == "top3_bassin_niveau":
-        contenu.append(_paragraphe("Les 3 premiers par niveau et par bassin — moyenne générale décroissante", centre=True, suivant=True))
     bassins = sorted({l["bassin"] for l in lignes}, key=_cle)
     annees = sorted({l.get("annee", "") for l in lignes if l.get("annee")})
-    contenu.append(_paragraphe("Bassins : " + ", ".join(bassins), taille=18, suivant=True))
+    contenu.append(_paragraphe(
+        f'Bassins sélectionnés : {len(bassins)}' if classement == "top3_bassin_niveau" else "Bassins : " + ", ".join(bassins),
+        taille=18, suivant=True))
     if code == "MIXTE":
         contenu.append(_paragraphe("Niveaux : " + ", ".join(n for n in NIVEAUX if n in data["niveaux"]) + " · Session : " + session, taille=18, suivant=True))
     if annees:
         contenu.append(_paragraphe("Année(s) universitaire(s) : " + ", ".join(annees), taille=18, suivant=True))
+    if classement == "top3_bassin_niveau":
+        contenu.append(_paragraphe("Les 3 meilleurs étudiants par niveau", gras=True, taille=24, centre=True, suivant=True))
+        contenu.append(_paragraphe("Tous les bassins sélectionnés confondus — Moyenne générale décroissante",
+                                   taille=18, centre=True, suivant=True))
+        contenu.append(_tableau_palmares(lignes, largeur))
+        # Le detail par bassin commence sur une nouvelle page.
+        titre_detail = _paragraphe("Les 3 premiers par niveau et par bassin", gras=True, taille=24, centre=True, suivant=True)
+        contenu.append(titre_detail.replace('<w:pageBreakBefore w:val="0"/>', '<w:pageBreakBefore w:val="1"/>'))
     for groupe in groupes:
         premier = groupe[0]
         intitule = (f'Bassin {premier["bassin"]} — Niveau {premier["niveau"]}' if data["regroupement"] == "bassin_niveau"
