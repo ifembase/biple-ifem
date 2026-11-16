@@ -110,9 +110,13 @@ def _tableau(lignes, colonnes, largeur, mixte):
     return ''.join(xml)
 
 
-def _groupes(lignes, mode):
+def _groupes(lignes, mode, classement="tous"):
     groupes = OrderedDict()
-    if mode == "bassin_niveau":
+    top3 = classement == "top3_bassin_niveau"
+    if top3:
+        cle = lambda l: (_cle(l["bassin"]), l["bassin_id"], NIVEAUX.index(l["niveau"]),
+                         -l["moyenne_generale"], _cle(l["nom"]), _cle(l["prenoms"]), l["matricule"])
+    elif mode == "bassin_niveau":
         cle = lambda l: (_cle(l["bassin"]), l["bassin_id"], NIVEAUX.index(l["niveau"]), _cle(l["nom"]), _cle(l["prenoms"]), l["matricule"])
     elif mode == "niveau":
         cle = lambda l: (NIVEAUX.index(l["niveau"]), _cle(l["nom"]), _cle(l["prenoms"]), l["matricule"])
@@ -120,7 +124,9 @@ def _groupes(lignes, mode):
         cle = lambda l: (_cle(l["nom"]), _cle(l["prenoms"]), l["matricule"])
     for ligne in sorted(lignes, key=cle):
         identifiant = (ligne["bassin_id"], ligne["niveau"]) if mode == "bassin_niveau" else (ligne["niveau"],) if mode == "niveau" else ("unique",)
-        groupes.setdefault(identifiant, []).append(ligne)
+        groupe = groupes.setdefault(identifiant, [])
+        if not top3 or len(groupe) < 3:
+            groupe.append(ligne)
     return list(groupes.values())
 
 
@@ -128,7 +134,9 @@ def generer_export(data):
     """Un unique DOCX, avec autant de tableaux et de pages que necessaire."""
     code = data["niveaux"][0] if len(data["niveaux"]) == 1 else "MIXTE"
     parties, largeur = _modele(code)
-    lignes = data["etudiants"]
+    classement = data.get("classement", "tous")
+    groupes = _groupes(data["etudiants"], data["regroupement"], classement)
+    lignes = [ligne for groupe in groupes for ligne in groupe]
     session = data.get("session") or "Non précisée"
     titre = "LISTE DES ADMIS" if data["critere"] == "admis" else "LISTE DES ÉTUDIANTS"
     # Les en-tetes des references contiennent des zones de texte flottantes.
@@ -137,6 +145,8 @@ def generer_export(data):
     if code != "MIXTE":
         contenu.append(_paragraphe(titre, gras=True, taille=24, centre=True, suivant=True))
     contenu.append(_paragraphe(f'Sélection : {CRITERES[data["critere"]]} · {len(lignes)} étudiant(s)', centre=True, suivant=True))
+    if classement == "top3_bassin_niveau":
+        contenu.append(_paragraphe("Les 3 premiers par niveau et par bassin — moyenne générale décroissante", centre=True, suivant=True))
     bassins = sorted({l["bassin"] for l in lignes}, key=_cle)
     annees = sorted({l.get("annee", "") for l in lignes if l.get("annee")})
     contenu.append(_paragraphe("Bassins : " + ", ".join(bassins), taille=18, suivant=True))
@@ -144,7 +154,7 @@ def generer_export(data):
         contenu.append(_paragraphe("Niveaux : " + ", ".join(n for n in NIVEAUX if n in data["niveaux"]) + " · Session : " + session, taille=18, suivant=True))
     if annees:
         contenu.append(_paragraphe("Année(s) universitaire(s) : " + ", ".join(annees), taille=18, suivant=True))
-    for groupe in _groupes(lignes, data["regroupement"]):
+    for groupe in groupes:
         premier = groupe[0]
         intitule = (f'Bassin {premier["bassin"]} — Niveau {premier["niveau"]}' if data["regroupement"] == "bassin_niveau"
                     else f'Niveau {premier["niveau"]} — Bassins regroupés' if data["regroupement"] == "niveau"

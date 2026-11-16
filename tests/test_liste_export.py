@@ -119,6 +119,29 @@ class TestListeExport(unittest.TestCase):
                 self.assertIsNone(z.testzip())
                 self.assertIn(f'TEST-{i}', z.read('word/document.xml').decode())
 
+    def test_top_trois_par_niveau_et_bassin_et_ordre_conserve_dans_word(self):
+        lignes = [dict(ligne(i), moyenne_generale=score, nom=nom) for i, score, nom in [
+            (1, 12, 'Alpha'), (2, 19, 'Zulu'), (3, 17, 'Bravo'), (4, 15, 'Charlie'), (5, 10, 'Delta')]]
+        lignes += [ligne(6, 'DTS', moyenne_generale=8), ligne(7, 'DTS', moyenne_generale=0)]
+        lignes += [ligne(i, bassin_id='2', moyenne_generale=score) for i, score in [(8, 10), (9, 18), (10, 16), (11, 14)]]
+        data = payload(lignes, niveaux=['DT3', 'DTS'], colonnes=['matricule', 'nom'], classement='top3_bassin_niveau')
+        with document(data) as z:
+            doc = ET.fromstring(z.read('word/document.xml'))
+            tableaux = doc.findall(f'.//{W}tbl')
+            matricules = lambda table: [''.join(row.find(W+'tc').itertext()) for row in table.findall(W+'tr')[1:]]
+            self.assertEqual([matricules(table) for table in tableaux], [
+                ['TEST-2', 'TEST-3', 'TEST-4'], ['TEST-6', 'TEST-7'], ['TEST-9', 'TEST-10', 'TEST-11']])
+            self.assertIn('8 étudiant(s)', ''.join(doc.itertext()))
+            self.assertIn('Les 3 premiers par niveau et par bassin', ''.join(doc.itertext()))
+
+    def test_top_trois_exige_une_moyenne_generale_et_un_ecrit_complet(self):
+        for extra in [dict(moyenne_generale=None), dict(moyenne_generale=15, note_ecrit=None),
+                      dict(moyenne_generale=float('nan')), dict(moyenne_generale=21)]:
+            with self.subTest(extra=extra), self.assertRaises(ValidationError):
+                payload([dict(ligne(), **extra)], classement='top3_bassin_niveau')
+        with self.assertRaises(ValidationError):
+            payload([ligne(moyenne_generale=15)], classement='top3_bassin_niveau', regroupement='niveau')
+
     def test_route_renvoie_un_document_word(self):
         response = export_liste_etudiants(ExportListeRequest(**payload()))
         self.assertIn('.docx', response.headers['content-disposition'])
