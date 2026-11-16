@@ -112,13 +112,9 @@ def _tableau(lignes, colonnes, largeur, mixte, *, definitions=None, compact=Fals
     return ''.join(xml)
 
 
-def _groupes(lignes, mode, classement="tous"):
+def _groupes(lignes, mode):
     groupes = OrderedDict()
-    top3 = classement == "top3_bassin_niveau"
-    if top3:
-        cle = lambda l: (_cle(l["bassin"]), l["bassin_id"], NIVEAUX.index(l["niveau"]),
-                         -l["moyenne_generale"], _cle(l["nom"]), _cle(l["prenoms"]), l["matricule"])
-    elif mode == "bassin_niveau":
+    if mode == "bassin_niveau":
         cle = lambda l: (_cle(l["bassin"]), l["bassin_id"], NIVEAUX.index(l["niveau"]), _cle(l["nom"]), _cle(l["prenoms"]), l["matricule"])
     elif mode == "niveau":
         cle = lambda l: (NIVEAUX.index(l["niveau"]), _cle(l["nom"]), _cle(l["prenoms"]), l["matricule"])
@@ -127,17 +123,12 @@ def _groupes(lignes, mode, classement="tous"):
     for ligne in sorted(lignes, key=cle):
         identifiant = (ligne["bassin_id"], ligne["niveau"]) if mode == "bassin_niveau" else (ligne["niveau"],) if mode == "niveau" else ("unique",)
         groupe = groupes.setdefault(identifiant, [])
-        if not top3 or len(groupe) < 3:
-            groupe.append(ligne)
+        groupe.append(ligne)
     return list(groupes.values())
 
 
-def _palmares_global(lignes):
-    """Trois meilleurs de chaque niveau, tous bassins selectionnes confondus.
-
-    Les trois premiers locaux suffisent comme candidats : un etudiant exclu
-    du top trois de son bassin ne peut pas entrer dans le top trois global.
-    """
+def _palmares_global(lignes, limite=3):
+    """Au plus N meilleurs de chaque niveau, tous bassins selectionnes confondus."""
     effectifs = {}
     palmares = []
     for ligne in sorted(lignes, key=lambda l: (
@@ -146,22 +137,20 @@ def _palmares_global(lignes):
     )):
         niveau = ligne["niveau"]
         rang = effectifs.get(niveau, 0) + 1
-        if rang > 3:
+        if rang > limite:
             continue
         effectifs[niveau] = rang
-        palmares.append(dict(ligne, rang=rang, nom_complet=" ".join(
-            valeur for valeur in (ligne["nom"], ligne["prenoms"]) if valeur)))
+        palmares.append(dict(ligne, rang=rang))
     return palmares
 
 
-def _tableau_palmares(lignes, largeur):
-    colonnes = OrderedDict([
-        ("niveau", ("Niveau", .7)), ("rang", ("Rang", .45)),
-        ("matricule", ("Matricule", 1.3)), ("nom_complet", ("Noms et prénoms", 3.5)),
+def _tableau_palmares(lignes, largeur, colonnes):
+    definitions = OrderedDict([
+        *COLONNES.items(), ("rang", ("Rang", .45)),
         ("bassin", ("Bassin", 2.1)), ("moyenne_generale", ("Moyenne générale", 1.2)),
     ])
-    return _tableau(_palmares_global(lignes), list(colonnes), largeur, True,
-                    definitions=colonnes, compact=True)
+    selection = ["niveau", "rang", *(c for c in colonnes if c != "niveau"), "bassin", "moyenne_generale"]
+    return _tableau(lignes, selection, largeur, True, definitions=definitions, compact=True)
 
 
 def generer_export(data):
@@ -169,8 +158,10 @@ def generer_export(data):
     code = data["niveaux"][0] if len(data["niveaux"]) == 1 else "MIXTE"
     parties, largeur = _modele(code)
     classement = data.get("classement", "tous")
-    groupes = _groupes(data["etudiants"], data["regroupement"], classement)
-    lignes = [ligne for groupe in groupes for ligne in groupe]
+    top = classement in ("top_n_niveau", "top3_bassin_niveau")
+    limite = data.get("top_n", 3) if classement != "top3_bassin_niveau" else 3
+    groupes = [] if top else _groupes(data["etudiants"], data["regroupement"])
+    lignes = _palmares_global(data["etudiants"], limite) if top else [ligne for groupe in groupes for ligne in groupe]
     session = data.get("session") or "Non précisée"
     titre = "LISTE DES ADMIS" if data["critere"] == "admis" else "LISTE DES ÉTUDIANTS"
     # Les en-tetes des references contiennent des zones de texte flottantes.
@@ -182,20 +173,17 @@ def generer_export(data):
     bassins = sorted({l["bassin"] for l in lignes}, key=_cle)
     annees = sorted({l.get("annee", "") for l in lignes if l.get("annee")})
     contenu.append(_paragraphe(
-        f'Bassins sélectionnés : {len(bassins)}' if classement == "top3_bassin_niveau" else "Bassins : " + ", ".join(bassins),
+        f'Bassins représentés dans le classement : {len(bassins)}' if top else "Bassins : " + ", ".join(bassins),
         taille=18, suivant=True))
     if code == "MIXTE":
         contenu.append(_paragraphe("Niveaux : " + ", ".join(n for n in NIVEAUX if n in data["niveaux"]) + " · Session : " + session, taille=18, suivant=True))
     if annees:
         contenu.append(_paragraphe("Année(s) universitaire(s) : " + ", ".join(annees), taille=18, suivant=True))
-    if classement == "top3_bassin_niveau":
-        contenu.append(_paragraphe("Les 3 meilleurs étudiants par niveau", gras=True, taille=24, centre=True, suivant=True))
+    if top:
+        contenu.append(_paragraphe(f"TOP {limite} — MEILLEURS ÉTUDIANTS PAR NIVEAU", gras=True, taille=24, centre=True, suivant=True))
         contenu.append(_paragraphe("Tous les bassins sélectionnés confondus — Moyenne générale décroissante",
                                    taille=18, centre=True, suivant=True))
-        contenu.append(_tableau_palmares(lignes, largeur))
-        # Le detail par bassin commence sur une nouvelle page.
-        titre_detail = _paragraphe("Les 3 premiers par niveau et par bassin", gras=True, taille=24, centre=True, suivant=True)
-        contenu.append(titre_detail.replace('<w:pageBreakBefore w:val="0"/>', '<w:pageBreakBefore w:val="1"/>'))
+        contenu.append(_tableau_palmares(lignes, largeur, data["colonnes"]))
     for groupe in groupes:
         premier = groupe[0]
         intitule = (f'Bassin {premier["bassin"]} — Niveau {premier["niveau"]}' if data["regroupement"] == "bassin_niveau"

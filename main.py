@@ -239,8 +239,17 @@ class ExportListeRequest(SchemaExport):
     colonnes: List[str] = Field(..., min_length=1, max_length=9)
     critere: Literal["tous", "avec_soutenance", "ecrit_sans_soutenance", "ecrit_termine", "admis", "en_cours", "sans_notes"] = "tous"
     regroupement: Literal["bassin_niveau", "niveau", "liste_unique"] = "bassin_niveau"
-    classement: Literal["tous", "top3_bassin_niveau"] = "tous"
+    classement: Literal["tous", "top_n_niveau"] = "tous"
+    top_n: int = Field(3, ge=1, le=10000, strict=True)
     session: str = Field("", max_length=80)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _ancien_classement(cls, data):
+        # Compatibilite avec les onglets ouverts avant le deploiement frontend.
+        if isinstance(data, dict) and data.get("classement") == "top3_bassin_niveau":
+            return {**data, "classement": "top_n_niveau", "top_n": 3, "regroupement": "niveau"}
+        return data
 
     @model_validator(mode="after")
     def _selection_coherente(self):
@@ -253,9 +262,9 @@ class ExportListeRequest(SchemaExport):
         identites = [(e.matricule, e.annee) for e in self.etudiants]
         if len(set(identites)) != len(identites):
             raise ValueError("Un etudiant figure plusieurs fois dans la selection")
-        if self.classement == "top3_bassin_niveau":
-            if self.regroupement != "bassin_niveau":
-                raise ValueError("Le classement des trois premiers est organise par bassin et par niveau")
+        if self.classement == "top_n_niveau":
+            if self.regroupement != "niveau":
+                raise ValueError("Le classement est organise par niveau, tous bassins selectionnes confondus")
             if any(e.note_ecrit is None or e.moyenne_generale is None for e in self.etudiants):
                 raise ValueError("Le classement exige un ecrit complet et la moyenne generale de chaque etudiant")
         return self
@@ -431,7 +440,7 @@ def export_liste_etudiants(req: ExportListeRequest):
     """Liste Word complete avec colonnes choisies et regroupement des bassins/niveaux."""
     code = "_".join(n for n in liste_export.NIVEAUX if n in req.niveaux)
     session = docgen.slugify(req.session) if req.session else "sans_session"
-    prefixe = "liste_top3" if req.classement == "top3_bassin_niveau" else "liste_etudiants"
+    prefixe = f"liste_top{req.top_n}_par_niveau" if req.classement == "top_n_niveau" else "liste_etudiants"
     donnees = liste_export.generer_export(req.model_dump())
     # Le DOCX est deja en memoire ; l'envoyer d'un bloc evite de decouper un
     # fichier ZIP binaire en centaines de fragments selon ses octets de ligne.

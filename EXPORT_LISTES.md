@@ -10,6 +10,24 @@ regroupés, ou liste unique avec niveaux confondus. Le résultat est un seul
 fichier `.docx`, paginé automatiquement, sans la limite de cinq étudiants du
 parcours historique des listes d’admis.
 
+L’option **Les meilleurs par niveau, tous bassins sélectionnés confondus**
+permet de saisir le nombre souhaité (top 3, 10, 20, etc.). Le nombre est un
+entier de 1 à 10 000. Le document contient uniquement ce classement global,
+sans détail supplémentaire par bassin. Le rang repart de 1 pour chaque niveau.
+Si moins de candidats remplissent les filtres, ils sont tous inclus.
+
+Le classement utilise la moyenne générale de la plateforme : moyenne de l’écrit
+complet et de la soutenance lorsqu’elle est notée, sinon moyenne de l’écrit
+complet. Les égalités sont départagées par nom, prénoms et matricule. Le niveau,
+le rang, le bassin et la moyenne générale accompagnent les colonnes choisies.
+L’en-tête du modèle reste celui du niveau sélectionné, ou le modèle mixte si
+plusieurs niveaux sont sélectionnés. Le classement peut occuper plusieurs pages.
+
+Pour ce mode, l’API reçoit `classement: "top_n_niveau"`, `top_n: 10` (par
+exemple), `regroupement: "niveau"` et la `moyenne_generale` de chaque candidat.
+L’ancien identifiant `top3_bassin_niveau` reste accepté pour les onglets déjà
+ouverts, mais produit uniquement un classement global de trois étudiants par niveau.
+
 Les colonnes disponibles sont matricule, niveau, nom, prénoms, date et lieu de
 naissance, note d’écrit, note de soutenance et mention. Une note manquante est
 imprimée avec un tiret ; une note égale à zéro reste une vraie note. La note
